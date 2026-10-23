@@ -1,4 +1,4 @@
-# Welcome to your Expo app 👋 <img width="40" height="40" alt="waving-hand" src="https://github.com/user-attachments/assets/a7f88be0-674b-4abf-8776-0652ff1eb8e7" />
+# Welcome to your Expo app <img width="40" height="40" alt="waving-hand" src="https://github.com/user-attachments/assets/a7f88be0-674b-4abf-8776-0652ff1eb8e7" />
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
