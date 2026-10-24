@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { router } from "expo-router";
-import { getMe } from "../lib/api";
+import api from "../lib/api";
+import { View, ActivityIndicator } from "react-native";
 
 export default function Index() {
   useEffect(() => {
@@ -10,25 +10,16 @@ export default function Index() {
 
   const checkAuth = async () => {
     try {
-      await getMe();
+      await api.get("/api/mobile/livechat/auth/me");
       router.replace("/livechat");
-    } catch (error) {
+    } catch {
       router.replace("/login");
     }
   };
 
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#2563eb" />
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#040f2d" }}>
+      <ActivityIndicator size="large" color="#27a343" />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#040f2d",
-  },
-});

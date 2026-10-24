@@ -1,47 +1,63 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { router } from "expo-router";
-import { getLiveChatConversations, getLiveChatMessages, sendLiveChatMessage, logout, getMe } from "../lib/api";
+import api from "../lib/api";
 
 interface Conversation {
-  id: string;
-  user?: { name: string; email: string };
-  lastMessage?: { content: string; createdAt: string };
+  id: number;
+  visitorName: string;
+  visitorEmail: string;
+  lastMessagePreview?: string;
+  unreadCount?: number;
+  status?: string;
 }
 
 interface Message {
-  id: string;
-  content: string;
-  senderType: "user" | "admin";
+  id: number;
+  sender: string;
+  body: string;
   createdAt: string;
 }
 
 export default function LiveChatScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [agents, setAgents] = useState<any[]>([]);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     checkAuth();
     loadConversations();
+    loadAgents();
+    const interval = setInterval(loadConversations, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const checkAuth = async () => {
     try {
-      await getMe();
+      await api.get("/api/mobile/livechat/auth/me");
     } catch (error) {
       router.replace("/login");
     }
   };
 
+  const loadAgents = async () => {
+    try {
+      const res = await api.get("/api/mobile/livechat/agents");
+      setAgents(res.data);
+    } catch (error) {
+      console.error("Failed to load agents", error);
+    }
+  };
+
   const loadConversations = async () => {
     try {
-      const data = await getLiveChatConversations();
-      setConversations(data.conversations || data);
+      const res = await api.get("/api/mobile/livechat/conversations");
+      setConversations(res.data);
     } catch (error) {
       console.error("Failed to load conversations", error);
     } finally {
@@ -49,10 +65,10 @@ export default function LiveChatScreen() {
     }
   };
 
-  const loadMessages = async (conversationId: string) => {
+  const loadMessages = async (conversationId: number) => {
     try {
-      const data = await getLiveChatMessages(conversationId);
-      setMessages(data.messages || data);
+      const res = await api.get(`/api/mobile/livechat/conversations/${conversationId}`);
+      setMessages(res.data.messages || []);
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -61,21 +77,30 @@ export default function LiveChatScreen() {
     }
   };
 
-  const handleSelectConversation = (conversationId: string) => {
+  const handleSelectConversation = (conversationId: number) => {
     setSelectedConversation(conversationId);
     loadMessages(conversationId);
   };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || sending) return;
+    if (agents.length === 0) {
+      Alert.alert("Error", "No agents available");
+      return;
+    }
 
     setSending(true);
     try {
-      await sendLiveChatMessage(selectedConversation, newMessage);
+      await api.post(`/api/mobile/livechat/conversations/${selectedConversation}/reply`, {
+        body: newMessage,
+        agentId: agents[0].id,
+        clientNonce: Math.random().toString(36).substring(2, 15),
+      });
       setNewMessage("");
       await loadMessages(selectedConversation);
-    } catch (error) {
-      Alert.alert("Error", "Failed to send message");
+      loadConversations();
+    } catch (error: any) {
+      Alert.alert("Error", error.response?.data?.error || "Failed to send message");
     } finally {
       setSending(false);
     }
@@ -83,7 +108,7 @@ export default function LiveChatScreen() {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await api.post("/api/mobile/livechat/auth/logout");
       router.replace("/login");
     } catch (error) {
       router.replace("/login");
@@ -116,13 +141,18 @@ export default function LiveChatScreen() {
               onPress={() => handleSelectConversation(item.id)}
             >
               <Text style={styles.conversationName}>
-                {item.user?.name || item.user?.email || "Unknown User"}
+              {item.visitorName || item.visitorEmail || "Unknown User"}
+            </Text>
+            {item.lastMessagePreview && (
+              <Text style={styles.conversationPreview} numberOfLines={1}>
+                {item.lastMessagePreview}
               </Text>
-              {item.lastMessage && (
-                <Text style={styles.conversationPreview} numberOfLines={1}>
-                  {item.lastMessage.content}
-                </Text>
-              )}
+            )}
+            {item.unreadCount && item.unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{item.unreadCount}</Text>
+              </View>
+            )}
             </TouchableOpacity>
           )}
           ListEmptyComponent={
@@ -154,10 +184,10 @@ export default function LiveChatScreen() {
           <View
             style={[
               styles.messageBubble,
-              item.senderType === "admin" ? styles.adminMessage : styles.userMessage,
+              item.sender === "agent" ? styles.adminMessage : item.sender === "visitor" ? styles.userMessage : styles.systemMessage,
             ]}
           >
-            <Text style={styles.messageText}>{item.content}</Text>
+            <Text style={[styles.messageText, item.sender === "agent" && styles.adminMessageText]}>{item.body}</Text>
           </View>
         )}
       />
@@ -258,8 +288,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0",
   },
+  systemMessage: {
+    alignSelf: "center",
+    backgroundColor: "#f0f0f0",
+  },
+  adminMessageText: {
+    color: "white",
+  },
   messageText: {
     color: "black",
+  },
+  badge: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    backgroundColor: "#27a343",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   inputContainer: {
     flexDirection: "row",
