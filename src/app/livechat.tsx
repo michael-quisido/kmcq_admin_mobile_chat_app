@@ -166,11 +166,11 @@ export default function LiveChatScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSelectedConversation(null)}>
-          <Text style={styles.backText}>← Back</Text>
+        <TouchableOpacity onPress={() => setSelectedConversation(null)} style={styles.headerButton}>
+          <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chat</Text>
-        <TouchableOpacity onPress={handleLogout}>
+        <Text style={styles.headerTitle} numberOfLines={1}>Chat</Text>
+        <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
@@ -178,7 +178,7 @@ export default function LiveChatScreen() {
       <FlatList
         ref={flatListRef}
         data={messages}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.messagesContainer}
         renderItem={({ item }) => (
           <View
@@ -235,18 +235,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#040f2d",
     paddingTop: 50,
   },
+  headerButton: {
+    minWidth: 60,
+    alignItems: "center",
+  },
   headerTitle: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
+    flex: 1,
+    textAlign: "center",
   },
   backText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 20,
+    fontWeight: "bold",
   },
   logoutText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 14,
   },
   conversationItem: {
     padding: 15,
@@ -271,6 +278,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     padding: 10,
+    paddingBottom: 20,
   },
   messageBubble: {
     maxWidth: "80%",
@@ -315,6 +323,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     padding: 10,
+    paddingBottom: 15,
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#e0e0e0",
