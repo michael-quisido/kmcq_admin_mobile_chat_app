@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
 
@@ -125,7 +126,7 @@ export default function LiveChatScreen() {
 
   if (!selectedConversation) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>LiveChat Conversations</Text>
           <TouchableOpacity onPress={handleLogout}>
@@ -134,7 +135,7 @@ export default function LiveChatScreen() {
         </View>
         <FlatList
           data={conversations}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.conversationItem}
@@ -159,12 +160,12 @@ export default function LiveChatScreen() {
             <Text style={styles.emptyText}>No conversations yet</Text>
           }
         />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => setSelectedConversation(null)} style={styles.headerButton}>
           <Text style={styles.backText}>←</Text>
@@ -175,44 +176,50 @@ export default function LiveChatScreen() {
         </TouchableOpacity>
       </View>
       
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.messagesContainer}
-        renderItem={({ item }) => (
-          <View
-            style={[
-              styles.messageBubble,
-              item.sender === "agent" ? styles.adminMessage : item.sender === "visitor" ? styles.userMessage : styles.systemMessage,
-            ]}
-          >
-            <Text style={[styles.messageText, item.sender === "agent" && styles.adminMessageText]}>{item.body}</Text>
-          </View>
-        )}
-      />
-      
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.messageInput}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          placeholder="Type a message..."
-          multiline
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
-          onPress={handleSendMessage}
-          disabled={!newMessage.trim() || sending}
-        >
-          {sending ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text style={styles.sendButtonText}>Send</Text>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.messagesContainer}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.messageBubble,
+                item.sender === "agent" ? styles.adminMessage : item.sender === "visitor" ? styles.userMessage : styles.systemMessage,
+              ]}
+            >
+              <Text style={[styles.messageText, item.sender === "agent" && styles.adminMessageText]}>{item.body}</Text>
+            </View>
           )}
-        </TouchableOpacity>
-      </View>
-    </View>
+        />
+        
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.messageInput}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            placeholder="Type a message..."
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
+            onPress={handleSendMessage}
+            disabled={!newMessage.trim() || sending}
+          >
+            {sending ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.sendButtonText}>Send</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -233,7 +240,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 15,
     backgroundColor: "#040f2d",
-    paddingTop: 50,
   },
   headerButton: {
     minWidth: 60,
@@ -325,7 +331,6 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     padding: 10,
-    paddingBottom: 15,
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#e0e0e0",
