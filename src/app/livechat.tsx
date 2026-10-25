@@ -140,20 +140,23 @@ export default function LiveChatScreen() {
             <TouchableOpacity
               style={styles.conversationItem}
               onPress={() => handleSelectConversation(item.id)}
+              activeOpacity={0.7}
             >
-              <Text style={styles.conversationName}>
-                {item.visitorName || item.visitorEmail || "Unknown User"}
-              </Text>
-              {item.lastMessagePreview && (
-                <Text style={styles.conversationPreview} numberOfLines={1}>
-                  {item.lastMessagePreview}
+              <View>
+                <Text style={styles.conversationName}>
+                  {(item.visitorName || item.visitorEmail || "Unknown User") + ""}
                 </Text>
-              )}
-              {item.unreadCount && item.unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{item.unreadCount}</Text>
-                </View>
-              )}
+                {item.lastMessagePreview ? (
+                  <Text style={styles.conversationPreview} numberOfLines={1}>
+                    {item.lastMessagePreview}
+                  </Text>
+                ) : null}
+                {item.unreadCount && item.unreadCount > 0 ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{String(item.unreadCount)}</Text>
+                  </View>
+                ) : null}
+              </View>
             </TouchableOpacity>
           )}
           ListEmptyComponent={
