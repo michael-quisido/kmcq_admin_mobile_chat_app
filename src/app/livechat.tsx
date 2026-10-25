@@ -141,18 +141,18 @@ export default function LiveChatScreen() {
               onPress={() => handleSelectConversation(item.id)}
             >
               <Text style={styles.conversationName}>
-              {item.visitorName || item.visitorEmail || "Unknown User"}
-            </Text>
-            {item.lastMessagePreview && (
-              <Text style={styles.conversationPreview} numberOfLines={1}>
-                {item.lastMessagePreview}
+                {item.visitorName || item.visitorEmail || "Unknown User"}
               </Text>
-            )}
-            {item.unreadCount && item.unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.unreadCount}</Text>
-              </View>
-            )}
+              {item.lastMessagePreview && (
+                <Text style={styles.conversationPreview} numberOfLines={1}>
+                  {item.lastMessagePreview}
+                </Text>
+              )}
+              {item.unreadCount && item.unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
           ListEmptyComponent={
@@ -265,10 +265,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 5,
+    paddingRight: 30,
   },
   conversationPreview: {
     fontSize: 14,
     color: "#666",
+    paddingRight: 30,
   },
   emptyText: {
     textAlign: "center",
