@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "kmcq_admin_chat_app",
-    "slug": "kmcq_admin_chat_app",
+    "name": "kmcq_admin_mobile_chat_app",
+    "slug": "kmcq_admin_mobile_chat_app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "kmcqadminchatapp",
+    "scheme": "kmcqadminmobilechatapp",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
