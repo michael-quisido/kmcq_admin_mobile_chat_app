@@ -99,6 +99,7 @@ export default function SettingsScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
           />
+          <Text style={styles.hint}>New visitor messages are emailed here. Phase 2 replies happen in this console.</Text>
 
           <Text style={styles.label}>Retention days</Text>
           <TextInput
@@ -108,6 +109,7 @@ export default function SettingsScreen() {
             placeholder="30"
             keyboardType="number-pad"
           />
+          <Text style={styles.hint}>Between 1 and 3650. Conversations are kept for this long; nothing is deleted automatically.</Text>
 
           <Text style={styles.label}>Stale after (minutes)</Text>
           <TextInput
@@ -117,6 +119,7 @@ export default function SettingsScreen() {
             placeholder="10"
             keyboardType="number-pad"
           />
+          <Text style={styles.hint}>Between 1 and 1440. A conversation quiet for this long is flagged in the inbox and shown to the visitor as still there.</Text>
 
           <Text style={styles.label}>Telegram chat ID</Text>
           <TextInput
@@ -124,8 +127,10 @@ export default function SettingsScreen() {
             value={telegramChatId}
             onChangeText={setTelegramChatId}
             placeholder="Chat ID"
-            keyboardType="number-pad"
+            keyboardType="numbers-and-punctuation"
           />
+          <Text style={styles.hint}>Unanswered chats are also pushed here. Create a bot with @BotFather, send it a message, then read the chat ID from getUpdates. Leave blank to turn this off.</Text>
+          {!telegramConfigured && <Text style={styles.hint}>Notifications are not active: the LIVE_CHAT_TELEGRAM_BOT_TOKEN environment variable is not set on the server.</Text>}
 
           <TouchableOpacity
             style={[styles.testButton, !canTest && styles.buttonDisabled]}
