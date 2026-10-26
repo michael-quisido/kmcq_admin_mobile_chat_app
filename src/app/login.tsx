@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from "react-native";
 import { router } from "expo-router";
 import api from "../lib/api";
 
@@ -50,6 +50,11 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <Image
+          source={require("../../assets/images/orangeBGkmcq-cloud-company-white-logoFinale.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>KMCQ LiveChat Mobile</Text>
         <Text style={styles.subtitle}>Administrator Access Only</Text>
       </View>
@@ -120,6 +125,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#040f2d", padding: 20, justifyContent: "center" },
   header: { alignItems: "center", marginBottom: 30 },
+  logo: { width: 250, height: 250, marginBottom: 20 },
   title: { fontSize: 28, fontWeight: "bold", color: "white" },
   subtitle: { fontSize: 16, color: "#27a343", marginTop: 5 },
   card: { backgroundColor: "white", padding: 30, borderRadius: 12 },
