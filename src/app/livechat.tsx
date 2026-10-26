@@ -250,24 +250,15 @@ export default function LiveChatScreen() {
             onPress={() => setMenuVisible(false)}
           >
             <View style={styles.menuContainer}>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  Alert.alert("Inbox", "Inbox feature");
-                }}
-              >
-                <Text style={styles.menuItemText}>Inbox</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  router.push("/agents");
-                }}
-              >
-                <Text style={styles.menuItemText}>Agents</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                router.push("/agents");
+              }}
+            >
+              <Text style={styles.menuItemText}>Agents</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -351,33 +342,24 @@ export default function LiveChatScreen() {
           onPress={() => setMenuVisible(false)}
         >
           <View style={styles.menuContainer}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                setSelectedConversation(null);
-              }}
-            >
-              <Text style={styles.menuItemText}>Inbox</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                router.push("/agents");
-              }}
-            >
-              <Text style={styles.menuItemText}>Agents</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                router.push("/settings");
-              }}
-            >
-              <Text style={styles.menuItemText}>LiveChat Settings</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              setMenuVisible(false);
+              router.push("/agents");
+            }}
+          >
+            <Text style={styles.menuItemText}>Agents</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              setMenuVisible(false);
+              router.push("/settings");
+            }}
+          >
+            <Text style={styles.menuItemText}>LiveChat Settings</Text>
+          </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
