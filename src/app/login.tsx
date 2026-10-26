@@ -125,7 +125,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#040f2d", padding: 20, justifyContent: "center" },
   header: { alignItems: "center", marginBottom: 30 },
-  logo: { width: 250, height: 250, marginBottom: 20 },
+  logo: { width: 150, height: 150, marginBottom: 20 },
   title: { fontSize: 28, fontWeight: "bold", color: "white" },
   subtitle: { fontSize: 16, color: "#27a343", marginTop: 5 },
   card: { backgroundColor: "white", padding: 30, borderRadius: 12 },
