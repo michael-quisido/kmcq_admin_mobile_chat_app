@@ -80,8 +80,66 @@ export default function LiveChatScreen() {
   };
 
   const handleSelectConversation = (conversationId: number) => {
-    setSelectedConversation(conversationId);
-    loadMessages(conversationId);
+    if (agents.length === 0) {
+      Alert.alert("No agents", "Create an agent first");
+      return;
+    }
+    Alert.alert(
+      "Select Agent",
+      "Choose which agent will respond",
+      [
+        ...agents.map((agent: any) => ({
+          text: `${agent.name} (${agent.status})`,
+          onPress: async () => {
+            try {
+              await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
+                assignedAgentId: agent.id,
+              });
+              setSelectedConversation(conversationId);
+              loadMessages(conversationId);
+            } catch (error: any) {
+              Alert.alert("Error", error.response?.data?.error || "Failed to assign agent");
+            }
+          },
+        })),
+        { text: "Cancel", style: "cancel" },
+      ]
+    );
+  };
+
+  const closeConversation = async () => {
+    if (!selectedConversation) return;
+    Alert.alert("Close Conversation", "Are you sure you want to close this conversation?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Close",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.patch(`/api/mobile/livechat/conversations/${selectedConversation}`, {
+              status: "closed",
+            });
+            setSelectedConversation(null);
+            loadConversations();
+            Alert.alert("Success", "Conversation closed");
+          } catch (error: any) {
+            Alert.alert("Error", error.response?.data?.error || "Failed to close conversation");
+          }
+        },
+      },
+    ]);
+  };
+
+  const reopenConversation = async (conversationId: number) => {
+    try {
+      await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
+        status: "open",
+      });
+      loadConversations();
+      Alert.alert("Success", "Conversation reopened");
+    } catch (error: any) {
+      Alert.alert("Error", error.response?.data?.error || "Failed to reopen conversation");
+    }
   };
 
   const handleSendMessage = async () => {
@@ -143,13 +201,26 @@ export default function LiveChatScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.conversationItem}
-              onPress={() => handleSelectConversation(item.id)}
+              onPress={() => {
+                if (item.status === "closed") {
+                  Alert.alert("Closed Conversation", "Do you want to reopen this conversation?", [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Reopen",
+                      onPress: () => reopenConversation(item.id),
+                    },
+                  ]);
+                } else {
+                  handleSelectConversation(item.id);
+                }
+              }}
               activeOpacity={0.7}
             >
               <View>
                 <Text style={styles.conversationName}>
                   {(item.visitorName || item.visitorEmail || "Unknown User") + ""}
                 </Text>
+                {item.status === "closed" && <Text style={{ fontSize: 12, color: "#d33", marginTop: 2 }}>Closed</Text>}
                 {item.lastMessagePreview ? (
                   <Text style={styles.conversationPreview} numberOfLines={1}>
                     {item.lastMessagePreview}
@@ -215,15 +286,15 @@ export default function LiveChatScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setSelectedConversation(null)} style={styles.headerButton}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>Chat</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setSelectedConversation(null)} style={styles.headerButton}>
+            <Text style={styles.backText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>Chat</Text>
+          <TouchableOpacity onPress={closeConversation} style={styles.headerButton}>
+            <Text style={styles.logoutText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
@@ -284,7 +355,7 @@ export default function LiveChatScreen() {
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
-                Alert.alert("Inbox", "Inbox feature");
+                setSelectedConversation(null);
               }}
             >
               <Text style={styles.menuItemText}>Inbox</Text>
