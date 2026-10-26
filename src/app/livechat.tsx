@@ -197,15 +197,15 @@ export default function LiveChatScreen() {
               >
                 <Text style={styles.menuItemText}>Agents</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setMenuVisible(false);
-                  Alert.alert("LiveChat Settings", "LiveChat Settings feature");
-                }}
-              >
-                <Text style={styles.menuItemText}>LiveChat Settings</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                router.push("/settings");
+              }}
+            >
+              <Text style={styles.menuItemText}>LiveChat Settings</Text>
+            </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -302,7 +302,7 @@ export default function LiveChatScreen() {
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
-                Alert.alert("LiveChat Settings", "LiveChat Settings feature");
+                router.push("/settings");
               }}
             >
               <Text style={styles.menuItemText}>LiveChat Settings</Text>
