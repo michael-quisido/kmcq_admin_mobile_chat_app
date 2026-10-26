@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
@@ -28,6 +28,7 @@ export default function LiveChatScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [agents, setAgents] = useState<any[]>([]);
+  const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -128,8 +129,11 @@ export default function LiveChatScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.headerButton}>
+            <Text style={styles.menuIcon}>☰</Text>
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>LiveChat Conversations</Text>
-          <TouchableOpacity onPress={handleLogout}>
+          <TouchableOpacity onPress={handleLogout} style={styles.headerButton}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -222,6 +226,48 @@ export default function LiveChatScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={styles.menuContainer}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                Alert.alert("Inbox", "Inbox feature");
+              }}
+            >
+              <Text style={styles.menuItemText}>Inbox</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                Alert.alert("Agents", "Agents feature");
+              }}
+            >
+              <Text style={styles.menuItemText}>Agents</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                Alert.alert("LiveChat Settings", "LiveChat Settings feature");
+              }}
+            >
+              <Text style={styles.menuItemText}>LiveChat Settings</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -247,6 +293,10 @@ const styles = StyleSheet.create({
   headerButton: {
     minWidth: 60,
     alignItems: "center",
+  },
+  menuIcon: {
+    color: "white",
+    fontSize: 24,
   },
   headerTitle: {
     color: "white",
@@ -360,5 +410,31 @@ const styles = StyleSheet.create({
   sendButtonText: {
     color: "white",
     fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  menuContainer: {
+    position: "absolute",
+    top: 90,
+    left: 10,
+    backgroundColor: "white",
+    borderRadius: 8,
+    paddingVertical: 8,
+    width: 200,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: "#333",
   },
 });
