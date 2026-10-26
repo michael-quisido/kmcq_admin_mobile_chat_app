@@ -293,7 +293,7 @@ export default function LiveChatScreen() {
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
-                Alert.alert("Agents", "Agents feature");
+                router.push("/agents");
               }}
             >
               <Text style={styles.menuItemText}>Agents</Text>
