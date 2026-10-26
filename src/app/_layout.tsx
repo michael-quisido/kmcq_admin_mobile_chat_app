@@ -6,6 +6,7 @@ export default function RootLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="livechat" />
+      <Stack.Screen name="agents" />
     </Stack>
   );
 }
