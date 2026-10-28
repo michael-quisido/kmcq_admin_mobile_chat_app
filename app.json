@@ -14,6 +14,7 @@
       "package": "com.kmcq.adminmobilechatapp",
       "versionCode": 1,
       "usesCleartextTraffic": true,
+      "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-kmcq-gmbh-512x512.png",
@@ -37,7 +38,15 @@
         }
       ],
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
