@@ -254,6 +254,15 @@ export default function LiveChatScreen() {
               style={styles.menuItem}
               onPress={() => {
                 setMenuVisible(false);
+                router.push("/account-settings");
+              }}
+            >
+              <Text style={styles.menuItemText}>Account Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
                 router.push("/agents");
               }}
             >
