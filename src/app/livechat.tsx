@@ -38,6 +38,7 @@ export default function LiveChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const lastMessageIdRef = useRef<number>(0);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const selectedConversationRef = useRef<number | null>(null);
 
   useEffect(() => {
     checkAuth();
@@ -51,6 +52,22 @@ export default function LiveChatScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    selectedConversationRef.current = selectedConversation;
+    if (selectedConversation) {
+      lastMessageIdRef.current = 0;
+      loadMessages(selectedConversation);
+      const interval = setInterval(() => {
+        if (selectedConversationRef.current) {
+          loadMessages(selectedConversationRef.current);
+        }
+      }, 3000);
+      return () => clearInterval(interval);
+    } else {
+      lastMessageIdRef.current = 0;
+    }
+  }, [selectedConversation]);
 
   const checkAuth = async () => {
     try {
@@ -113,10 +130,16 @@ export default function LiveChatScreen() {
       } else {
         lastMessageIdRef.current = 0;
       }
-      setMessages(newMessages);
+      setMessages((prev) => {
+        if (prev.length === newMessages.length) {
+          const same = prev.every((m, i) => m.id === newMessages[i]?.id && m.body === newMessages[i]?.body);
+          if (same) return prev;
+        }
+        return newMessages;
+      });
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      }, 50);
     } catch (error) {
       console.error("Failed to load messages", error);
     }
