@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal } from "react-native";
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal, AppState } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
@@ -39,14 +39,41 @@ export default function LiveChatScreen() {
   const lastMessageIdRef = useRef<number>(0);
   const soundRef = useRef<Audio.Sound | null>(null);
   const selectedConversationRef = useRef<number | null>(null);
+  const inFlightRef = useRef({ conversations: false, agents: false, messages: false });
+  const retryTimeoutsRef = useRef<{ conversations?: any; agents?: any }>({});
+
+  const scheduleRetry = (key: "conversations" | "agents", fn: () => Promise<void>) => {
+    if (retryTimeoutsRef.current[key]) return;
+    retryTimeoutsRef.current[key] = setTimeout(async () => {
+      retryTimeoutsRef.current[key] = undefined;
+      try {
+        await fn();
+      } catch {
+        scheduleRetry(key, fn);
+      }
+    }, 3000);
+  };
 
   useEffect(() => {
     checkAuth();
     loadConversations();
     loadAgents();
     const interval = setInterval(loadConversations, 5000);
+    const appStateSub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        checkAuth().catch(() => {});
+        loadConversations().catch(() => {});
+        loadAgents().catch(() => {});
+        if (selectedConversationRef.current) {
+          loadMessages(selectedConversationRef.current).catch(() => {});
+        }
+      }
+    });
     return () => {
       clearInterval(interval);
+      appStateSub.remove();
+      if (retryTimeoutsRef.current.conversations) clearTimeout(retryTimeoutsRef.current.conversations);
+      if (retryTimeoutsRef.current.agents) clearTimeout(retryTimeoutsRef.current.agents);
       if (soundRef.current && soundRef.current.unloadAsync) {
         soundRef.current.unloadAsync().catch(() => {});
         soundRef.current = null;
@@ -73,28 +100,59 @@ export default function LiveChatScreen() {
   const checkAuth = async () => {
     try {
       await api.get("/api/mobile/livechat/auth/me");
-    } catch (error) {
-      router.replace("/login");
+      return true;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        router.replace("/login");
+        return false;
+      }
+      return false;
     }
   };
 
   const loadAgents = async () => {
+    if (inFlightRef.current.agents) return;
+    inFlightRef.current.agents = true;
     try {
       const res = await api.get("/api/mobile/livechat/agents");
-      setAgents(res.data);
-    } catch (error) {
-      console.error("Failed to load agents", error);
+      setAgents(Array.isArray(res.data) ? res.data : []);
+      if (retryTimeoutsRef.current.agents) {
+        clearTimeout(retryTimeoutsRef.current.agents);
+        retryTimeoutsRef.current.agents = undefined;
+      }
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        router.replace("/login");
+        return;
+      }
+      scheduleRetry("agents", loadAgents);
+    } finally {
+      inFlightRef.current.agents = false;
     }
   };
 
   const loadConversations = async () => {
+    if (inFlightRef.current.conversations) return;
+    inFlightRef.current.conversations = true;
     try {
       const res = await api.get("/api/mobile/livechat/conversations");
-      setConversations(res.data);
-    } catch (error) {
-      console.error("Failed to load conversations", error);
+      setConversations(Array.isArray(res.data) ? res.data : []);
+      if (retryTimeoutsRef.current.conversations) {
+        clearTimeout(retryTimeoutsRef.current.conversations);
+        retryTimeoutsRef.current.conversations = undefined;
+      }
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        router.replace("/login");
+        return;
+      }
+      scheduleRetry("conversations", loadConversations);
     } finally {
       setLoading(false);
+      inFlightRef.current.conversations = false;
     }
   };
 
@@ -132,9 +190,11 @@ export default function LiveChatScreen() {
   };
 
   const loadMessages = async (conversationId: number) => {
+    if (inFlightRef.current.messages) return;
+    inFlightRef.current.messages = true;
     try {
       const res = await api.get(`/api/mobile/livechat/conversations/${conversationId}`);
-      const newMessages = res.data.messages || [];
+      const newMessages = Array.isArray(res.data?.messages) ? res.data.messages : [];
       if (newMessages.length > 0) {
         const latestId = newMessages[newMessages.length - 1].id;
         if (lastMessageIdRef.current > 0 && latestId > lastMessageIdRef.current) {
@@ -157,8 +217,14 @@ export default function LiveChatScreen() {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 50);
-    } catch (error) {
-      console.error("Failed to load messages", error);
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        router.replace("/login");
+        return;
+      }
+    } finally {
+      inFlightRef.current.messages = false;
     }
   };
 
