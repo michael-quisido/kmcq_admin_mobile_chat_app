@@ -3,7 +3,12 @@ import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Activity
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
-import { Audio } from "expo-av";
+let Audio: any = null;
+try {
+  Audio = require("expo-av").Audio;
+} catch (e) {
+  Audio = null;
+}
 
 interface Conversation {
   id: number;
@@ -41,7 +46,7 @@ export default function LiveChatScreen() {
     const interval = setInterval(loadConversations, 5000);
     return () => {
       clearInterval(interval);
-      if (soundRef.current) {
+      if (soundRef.current && soundRef.current.unloadAsync) {
         soundRef.current.unloadAsync();
       }
     };
@@ -77,6 +82,7 @@ export default function LiveChatScreen() {
 
   const playNotificationSound = async () => {
     try {
+      if (!Audio || !Audio.Sound) return;
       if (soundRef.current) {
         await soundRef.current.replayAsync();
         return;
