@@ -17,7 +17,7 @@
       "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-kmcq-gmbh-512x512.png",
+        "foregroundImage": "./assets/images/kmcq-gmbh-android-icon-foreground-512x512.png",
         "backgroundImage": "./assets/images/android-kmcq-gmbh-512x512.png",
         "monochromeImage": "./assets/images/android-kmcq-gmbh-512x512.png"
       },
