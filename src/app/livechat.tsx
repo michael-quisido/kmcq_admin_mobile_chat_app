@@ -3,6 +3,7 @@ import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Activity
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
+import { Audio } from "expo-av";
 
 interface Conversation {
   id: number;
@@ -30,13 +31,20 @@ export default function LiveChatScreen() {
   const [agents, setAgents] = useState<any[]>([]);
   const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const lastMessageIdRef = useRef<number>(0);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     checkAuth();
     loadConversations();
     loadAgents();
     const interval = setInterval(loadConversations, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
   }, []);
 
   const checkAuth = async () => {
@@ -67,10 +75,39 @@ export default function LiveChatScreen() {
     }
   };
 
+  const playNotificationSound = async () => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.replayAsync();
+        return;
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3")
+      );
+      soundRef.current = sound;
+      await sound.playAsync();
+    } catch (error) {
+      console.error("Failed to play notification sound", error);
+    }
+  };
+
   const loadMessages = async (conversationId: number) => {
     try {
       const res = await api.get(`/api/mobile/livechat/conversations/${conversationId}`);
-      setMessages(res.data.messages || []);
+      const newMessages = res.data.messages || [];
+      if (newMessages.length > 0) {
+        const latestId = newMessages[newMessages.length - 1].id;
+        if (lastMessageIdRef.current > 0 && latestId > lastMessageIdRef.current) {
+          const latestMsg = newMessages[newMessages.length - 1];
+          if (latestMsg.sender === "visitor" || latestMsg.sender === "system") {
+            playNotificationSound();
+          }
+        }
+        lastMessageIdRef.current = latestId;
+      } else {
+        lastMessageIdRef.current = 0;
+      }
+      setMessages(newMessages);
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -96,6 +133,7 @@ export default function LiveChatScreen() {
                 assignedAgentId: agent.id,
               });
               setSelectedConversation(conversationId);
+              lastMessageIdRef.current = 0;
               loadMessages(conversationId);
             } catch (error: any) {
               Alert.alert("Error", error.response?.data?.error || "Failed to assign agent");
