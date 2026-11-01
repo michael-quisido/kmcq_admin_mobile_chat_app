@@ -48,7 +48,8 @@ export default function LiveChatScreen() {
     return () => {
       clearInterval(interval);
       if (soundRef.current && soundRef.current.unloadAsync) {
-        soundRef.current.unloadAsync();
+        soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
       }
     };
   }, []);
@@ -100,17 +101,33 @@ export default function LiveChatScreen() {
   const playNotificationSound = async () => {
     try {
       if (!Audio || !Audio.Sound) return;
+      try {
+        if (Audio.setAudioModeAsync) {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: false,
+            staysActiveInBackground: false,
+            playsInSilentModeIOS: true,
+            shouldDuckAndroid: true,
+            playThroughEarpieceAndroid: false,
+          });
+        }
+      } catch {}
       if (soundRef.current) {
-        await soundRef.current.replayAsync();
-        return;
+        try {
+          await soundRef.current.setPositionAsync(0);
+          await soundRef.current.playAsync();
+          return;
+        } catch {
+          soundRef.current = null;
+        }
       }
       const { sound } = await Audio.Sound.createAsync(
-        require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3")
+        require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3"),
+        { shouldPlay: true, volume: 1.0 }
       );
       soundRef.current = sound;
-      await sound.playAsync();
     } catch (error) {
-      console.error("Failed to play notification sound", error);
+      // Do not log message content
     }
   };
 
