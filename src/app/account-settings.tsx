@@ -39,7 +39,7 @@ export default function AccountSettingsScreen() {
       setUsername(res.data.user.username);
     } catch (error: any) {
       Alert.alert("Error", "Failed to fetch user");
-      router.back();
+      if (router.canGoBack()) router.back(); else router.replace("/");
     } finally {
       setLoading(false);
     }
@@ -173,7 +173,7 @@ export default function AccountSettingsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+        <TouchableOpacity onPress={() => { if (router.canGoBack()) router.back(); else router.replace("/"); }} style={styles.headerButton}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Account Settings</Text>

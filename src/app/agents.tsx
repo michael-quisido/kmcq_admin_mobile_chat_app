@@ -116,7 +116,7 @@ export default function AgentsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+        <TouchableOpacity onPress={() => { if (router.canGoBack()) router.back(); else router.replace("/"); }} style={styles.headerButton}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Agents</Text>
