@@ -91,7 +91,7 @@ export default function LiveChatScreen() {
         if (selectedConversationRef.current) {
           loadMessages(selectedConversationRef.current);
         }
-      }, 3000);
+      }, 2000);
       return () => clearInterval(interval);
     } else {
       lastMessageIdRef.current = 0;
@@ -171,20 +171,27 @@ export default function LiveChatScreen() {
           });
         }
       } catch {}
-      if (soundRef.current) {
-        try {
-          await soundRef.current.setPositionAsync(0);
-          await soundRef.current.playAsync();
-          return;
-        } catch {
+      try {
+        if (soundRef.current) {
+          try {
+            await soundRef.current.unloadAsync();
+          } catch {}
           soundRef.current = null;
         }
-      }
-      const { sound } = await Audio.Sound.createAsync(
-        require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3"),
-        { shouldPlay: true, volume: 1.0 }
-      );
-      soundRef.current = sound;
+        const { sound } = await Audio.Sound.createAsync(
+          require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3"),
+          { shouldPlay: true, volume: 1.0 }
+        );
+        soundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status: any) => {
+          if (status && status.didJustFinish) {
+            if (soundRef.current === sound) {
+              sound.unloadAsync().catch(() => {});
+              soundRef.current = null;
+            }
+          }
+        });
+      } catch {}
     } catch (error) {
       // Do not log message content
     }
