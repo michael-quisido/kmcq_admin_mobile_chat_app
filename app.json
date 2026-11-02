@@ -32,7 +32,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#040f2d",
           "image": "./assets/images/kmcq-splash-touch-icon.png",
           "imageWidth": 76
         }
