@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal, AppState } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
 let Audio: any = null;
@@ -27,6 +27,7 @@ interface Message {
 }
 
 export default function LiveChatScreen() {
+  const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -468,7 +469,7 @@ export default function LiveChatScreen() {
           )}
         />
         
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           <TextInput
             style={styles.messageInput}
             value={newMessage}
@@ -637,7 +638,8 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: "row",
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingTop: 10,
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "#e0e0e0",
