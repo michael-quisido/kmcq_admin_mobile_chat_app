@@ -6,7 +6,7 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 ## KMCQ Admin Chat Mobile App (WebView)
 
 A simple Expo WebView wrapper for the KMCQ admin livechat at `/administrator/livechat`. Restricted to the same origin for auth and livechat routes only.
->>>>>>> 6ec4819 (docs: update README for WebView wrapper)
+6ec4819 (docs: update README for WebView wrapper)
 
 ## Setup
 
