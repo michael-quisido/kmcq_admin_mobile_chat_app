@@ -2,7 +2,7 @@
   "expo": {
     "name": "kmcq_admin_mobile_chat_app",
     "slug": "kmcq-gmbh",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/orangeBGkmcq-cloud-company-white-logoFinale.png",
     "scheme": "kmcqadminmobilechatapp",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.kmcq.adminmobilechatapp",
-      "versionCode": 2,
+      "versionCode": 1,
       "usesCleartextTraffic": true,
       "networkSecurityConfig": "./android/app/src/main/res/xml/network_security_config.xml",
       "adaptiveIcon": {
