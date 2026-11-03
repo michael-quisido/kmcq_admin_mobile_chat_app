@@ -59,7 +59,10 @@ export default function LiveChatScreen() {
     checkAuth();
     loadConversations();
     loadAgents();
-    const interval = setInterval(loadConversations, 5000);
+    const interval = setInterval(() => {
+      loadConversations();
+      loadAgents();
+    }, 5000);
     const appStateSub = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
         checkAuth().catch(() => {});
