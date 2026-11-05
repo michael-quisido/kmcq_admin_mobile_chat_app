@@ -9,6 +9,7 @@ export default function RootLayout() {
       <Stack.Screen name="agents" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="account-settings" />
+      <Stack.Screen name="notification-sound" />
     </Stack>
   );
 }

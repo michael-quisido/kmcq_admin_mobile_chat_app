@@ -4,11 +4,23 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { router } from "expo-router";
 import api from "../lib/api";
 let Audio: any = null;
-try {
-  Audio = require("expo-av").Audio;
-} catch (e) {
-  Audio = null;
-}
+const loadAudio = () => {
+  if (Audio) return Audio;
+  try {
+    // Avoid requiring in problematic environments
+    const mod = require("expo-av");
+    if (mod && mod.Audio) {
+      Audio = mod.Audio;
+      return Audio;
+    }
+    return null;
+  } catch {
+    Audio = null;
+    return null;
+  }
+};
+// @ts-ignore
+import { getCustomSoundInfo } from "../lib/notifications/customSound";
 
 interface Conversation {
   id: number;
@@ -38,7 +50,7 @@ export default function LiveChatScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const lastMessageIdRef = useRef<number>(0);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<any>(null);
   const selectedConversationRef = useRef<number | null>(null);
   const inFlightRef = useRef({ conversations: false, agents: false, messages: false });
   const retryTimeoutsRef = useRef<{ conversations?: any; agents?: any }>({});
@@ -162,10 +174,16 @@ export default function LiveChatScreen() {
 
   const playNotificationSound = async () => {
     try {
-      if (!Audio || !Audio.Sound) return;
+      let A: any = null;
       try {
-        if (Audio.setAudioModeAsync) {
-          await Audio.setAudioModeAsync({
+        A = loadAudio();
+      } catch {
+        return;
+      }
+      if (!A || !A.Sound) return;
+      try {
+        if (A.setAudioModeAsync) {
+          await A.setAudioModeAsync({
             allowsRecordingIOS: false,
             staysActiveInBackground: false,
             playsInSilentModeIOS: true,
@@ -181,19 +199,31 @@ export default function LiveChatScreen() {
           } catch {}
           soundRef.current = null;
         }
-        const { sound } = await Audio.Sound.createAsync(
-          require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3"),
-          { shouldPlay: true, volume: 1.0 }
-        );
-        soundRef.current = sound;
-        sound.setOnPlaybackStatusUpdate((status: any) => {
-          if (status && status.didJustFinish) {
-            if (soundRef.current === sound) {
-              sound.unloadAsync().catch(() => {});
-              soundRef.current = null;
-            }
+        let source: any = null;
+        try {
+          const info = await getCustomSoundInfo();
+          if (info.uri) {
+            source = { uri: info.uri };
           }
-        });
+        } catch {}
+        if (!source) {
+          try {
+            source = require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3");
+          } catch {}
+        }
+        if (!source) return;
+        try {
+          const { sound } = await A.Sound.createAsync(source, { shouldPlay: true, volume: 1.0 });
+          soundRef.current = sound;
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status && status.didJustFinish) {
+              if (soundRef.current === sound) {
+                sound.unloadAsync().catch(() => {});
+                soundRef.current = null;
+              }
+            }
+          });
+        } catch {}
       } catch {}
     } catch (error) {
       // Do not log message content
@@ -239,7 +269,10 @@ export default function LiveChatScreen() {
     }
   };
 
-  const handleSelectConversation = (conversationId: number) => {
+  const handleSelectConversation = async (conversationId: number) => {
+    try {
+      await loadAgents();
+    } catch {}
     if (agents.length === 0) {
       Alert.alert("No agents", "Create an agent first");
       return;

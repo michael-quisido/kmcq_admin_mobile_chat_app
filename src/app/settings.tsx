@@ -148,6 +148,10 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.saveButton} onPress={save} disabled={saving}>
             <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save"}</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#1f2937", marginTop: 10 }]} onPress={() => router.push("/notification-sound")}>
+            <Text style={styles.saveButtonText}>Notification sound</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
