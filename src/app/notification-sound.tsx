@@ -7,7 +7,6 @@ let Audio: any = null;
 const loadAudio2 = () => {
   if (Audio) return Audio;
   try {
-    // Try to require; if it throws due to missing native module, catch it
     const mod = require("expo-av");
     if (mod && mod.Audio) {
       Audio = mod.Audio;
@@ -88,14 +87,18 @@ export default function NotificationSoundScreen() {
         return;
       }
       if (playing && sound) {
-        await sound.stopAsync().catch(() => {});
-        await sound.unloadAsync().catch(() => {});
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+        } catch {}
         setSound(null);
         setPlaying(false);
         return;
       }
       if (sound) {
-        await sound.unloadAsync().catch(() => {});
+        try {
+          await sound.unloadAsync();
+        } catch {}
         setSound(null);
       }
       try {
@@ -128,6 +131,10 @@ export default function NotificationSoundScreen() {
         const res = await A.Sound.createAsync(source, { shouldPlay: true, volume: 1.0 });
         s = res.sound;
       } catch (e) {
+        Alert.alert("Error", "Failed to play sound");
+        return;
+      }
+      if (!s) {
         Alert.alert("Error", "Failed to play sound");
         return;
       }

@@ -7,14 +7,13 @@ let Audio: any = null;
 const loadAudio = () => {
   if (Audio) return Audio;
   try {
-    // Avoid requiring in problematic environments
     const mod = require("expo-av");
     if (mod && mod.Audio) {
       Audio = mod.Audio;
       return Audio;
     }
     return null;
-  } catch {
+  } catch (e) {
     Audio = null;
     return null;
   }
@@ -213,6 +212,7 @@ export default function LiveChatScreen() {
         }
         if (!source) return;
         try {
+        try {
           const { sound } = await A.Sound.createAsync(source, { shouldPlay: true, volume: 1.0 });
           soundRef.current = sound;
           sound.setOnPlaybackStatusUpdate((status: any) => {
@@ -223,6 +223,7 @@ export default function LiveChatScreen() {
               }
             }
           });
+        } catch {}
         } catch {}
       } catch {}
     } catch (error) {
