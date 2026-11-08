@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import type * as Preferences from "../preferences";
 
 jest.mock("expo-secure-store", () => {
   const store = new Map<string, string>();
@@ -30,20 +31,20 @@ beforeEach(() => {
 
 describe("sounds preference", () => {
   it("defaults to enabled when nothing is stored", async () => {
-    const { loadSoundsEnabled, isSoundsEnabled } = await import("../preferences");
+    const { loadSoundsEnabled, isSoundsEnabled } = require("../preferences") as typeof Preferences;
     await expect(loadSoundsEnabled()).resolves.toBe(true);
     expect(isSoundsEnabled()).toBe(true);
   });
 
   it("loads a stored false value", async () => {
+    const { loadSoundsEnabled, isSoundsEnabled } = require("../preferences") as typeof Preferences;
     secureStore().__store.set("kmcq_notification_sounds_enabled", "false");
-    const { loadSoundsEnabled, isSoundsEnabled } = await import("../preferences");
     await expect(loadSoundsEnabled()).resolves.toBe(false);
     expect(isSoundsEnabled()).toBe(false);
   });
 
   it("updates the cache and storage when changed", async () => {
-    const { isSoundsEnabled, setSoundsEnabled } = await import("../preferences");
+    const { isSoundsEnabled, setSoundsEnabled } = require("../preferences") as typeof Preferences;
     await setSoundsEnabled(false);
     expect(isSoundsEnabled()).toBe(false);
     expect(secureStore().setItemAsync).toHaveBeenCalledWith("kmcq_notification_sounds_enabled", "false");
