@@ -1,23 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { File } from "expo-file-system";
-let Audio: any = null;
-const loadAudio2 = () => {
-  if (Audio) return Audio;
-  try {
-    const mod = require("expo-av");
-    if (mod && mod.Audio) {
-      Audio = mod.Audio;
-      return Audio;
-    }
-    return null;
-  } catch (e) {
-    Audio = null;
-    return null;
-  }
-};
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer, type AudioSource } from "expo-audio";
 import { getCustomSoundInfo, saveCustomSoundFromPicked, clearCustomSound } from "../lib/notifications/customSound";
 
 export default function NotificationSoundScreen() {
@@ -25,7 +11,7 @@ export default function NotificationSoundScreen() {
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState(false);
   const [playing, setPlaying] = useState(false);
-  const [sound, setSound] = useState<any>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -42,8 +28,11 @@ export default function NotificationSoundScreen() {
   useEffect(() => {
     load();
     return () => {
-      if (sound) {
-        sound.unloadAsync().catch(() => {});
+      if (playerRef.current) {
+        try {
+          playerRef.current.remove();
+        } catch {}
+        playerRef.current = null;
       }
     };
   }, []);
@@ -75,47 +64,34 @@ export default function NotificationSoundScreen() {
 
   const preview = async () => {
     try {
-      let A: any = null;
-      try {
-        A = loadAudio2();
-      } catch {
-        Alert.alert("Audio Not Available", "Audio module not available in this build.");
-        return;
-      }
-      if (!A || !A.Sound) {
-        Alert.alert("Audio Not Available", "Audio module not available in this build.");
-        return;
-      }
-      if (playing && sound) {
+      if (playing && playerRef.current) {
         try {
-          await sound.stopAsync();
-          await sound.unloadAsync();
+          playerRef.current.pause();
         } catch {}
-        setSound(null);
+        try {
+          playerRef.current.remove();
+        } catch {}
+        playerRef.current = null;
         setPlaying(false);
         return;
       }
-      if (sound) {
+      if (playerRef.current) {
         try {
-          await sound.unloadAsync();
+          playerRef.current.remove();
         } catch {}
-        setSound(null);
+        playerRef.current = null;
       }
       try {
-        if (A.setAudioModeAsync) {
-          await A.setAudioModeAsync({
-            allowsRecordingIOS: false,
-            playsInSilentModeIOS: true,
-            shouldDuckAndroid: true,
-            playThroughEarpieceAndroid: false,
-          });
-        }
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          interruptionMode: "duckOthers",
+          allowsRecording: false,
+          shouldRouteThroughEarpiece: false,
+        });
       } catch {}
-      let source: any = null;
+      let source: AudioSource | null = null;
       if (info.uri) {
-        try {
-          source = { uri: info.uri };
-        } catch {}
+        source = { uri: info.uri };
       }
       if (!source) {
         try {
@@ -126,27 +102,29 @@ export default function NotificationSoundScreen() {
         Alert.alert("Error", "No sound available");
         return;
       }
-      let s: any = null;
+      let player: AudioPlayer;
       try {
-        const res = await A.Sound.createAsync(source, { shouldPlay: true, volume: 1.0 });
-        s = res.sound;
-      } catch (e) {
+        player = createAudioPlayer(source, { updateInterval: 250 });
+      } catch {
         Alert.alert("Error", "Failed to play sound");
         return;
       }
-      if (!s) {
-        Alert.alert("Error", "Failed to play sound");
-        return;
-      }
-      setSound(s);
+      playerRef.current = player;
       setPlaying(true);
-      s.setOnPlaybackStatusUpdate((status: any) => {
-        if (status && status.didJustFinish) {
-          setPlaying(false);
-          s.unloadAsync().catch(() => {});
-          setSound(null);
+      const subscription = player.addListener("playbackStatusUpdate", (status) => {
+        if (status.didJustFinish) {
+          subscription.remove();
+          if (playerRef.current === player) {
+            playerRef.current = null;
+            setPlaying(false);
+          }
+          try {
+            player.remove();
+          } catch {}
         }
       });
+      player.volume = 1.0;
+      player.play();
     } catch {
       Alert.alert("Error", "Cannot play this audio file");
       setPlaying(false);

@@ -3,22 +3,7 @@ import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Activity
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
-let Audio: any = null;
-const loadAudio = () => {
-  if (Audio) return Audio;
-  try {
-    const mod = require("expo-av");
-    if (mod && mod.Audio) {
-      Audio = mod.Audio;
-      return Audio;
-    }
-    return null;
-  } catch (e) {
-    Audio = null;
-    return null;
-  }
-};
-// @ts-ignore
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer, type AudioSource } from "expo-audio";
 import { getCustomSoundInfo } from "../lib/notifications/customSound";
 
 interface Conversation {
@@ -49,7 +34,7 @@ export default function LiveChatScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const lastMessageIdRef = useRef<number>(0);
-  const soundRef = useRef<any>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
   const selectedConversationRef = useRef<number | null>(null);
   const inFlightRef = useRef({ conversations: false, agents: false, messages: false });
   const retryTimeoutsRef = useRef<{ conversations?: any; agents?: any }>({});
@@ -89,8 +74,10 @@ export default function LiveChatScreen() {
       appStateSub.remove();
       if (retryTimeoutsRef.current.conversations) clearTimeout(retryTimeoutsRef.current.conversations);
       if (retryTimeoutsRef.current.agents) clearTimeout(retryTimeoutsRef.current.agents);
-      if (soundRef.current && soundRef.current.unloadAsync) {
-        soundRef.current.unloadAsync().catch(() => {});
+      if (soundRef.current) {
+        try {
+          soundRef.current.remove();
+        } catch {}
         soundRef.current = null;
       }
     };
@@ -173,32 +160,22 @@ export default function LiveChatScreen() {
 
   const playNotificationSound = async () => {
     try {
-      let A: any = null;
       try {
-        A = loadAudio();
-      } catch {
-        return;
-      }
-      if (!A || !A.Sound) return;
-      try {
-        if (A.setAudioModeAsync) {
-          await A.setAudioModeAsync({
-            allowsRecordingIOS: false,
-            staysActiveInBackground: false,
-            playsInSilentModeIOS: true,
-            shouldDuckAndroid: true,
-            playThroughEarpieceAndroid: false,
-          });
-        }
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          interruptionMode: "duckOthers",
+          allowsRecording: false,
+          shouldRouteThroughEarpiece: false,
+        });
       } catch {}
       try {
         if (soundRef.current) {
           try {
-            await soundRef.current.unloadAsync();
+            soundRef.current.remove();
           } catch {}
           soundRef.current = null;
         }
-        let source: any = null;
+        let source: AudioSource | null = null;
         try {
           const info = await getCustomSoundInfo();
           if (info.uri) {
@@ -211,22 +188,23 @@ export default function LiveChatScreen() {
           } catch {}
         }
         if (!source) return;
-        try {
-        try {
-          const { sound } = await A.Sound.createAsync(source, { shouldPlay: true, volume: 1.0 });
-          soundRef.current = sound;
-          sound.setOnPlaybackStatusUpdate((status: any) => {
-            if (status && status.didJustFinish) {
-              if (soundRef.current === sound) {
-                sound.unloadAsync().catch(() => {});
-                soundRef.current = null;
-              }
+        const player = createAudioPlayer(source, { updateInterval: 250 });
+        soundRef.current = player;
+        player.volume = 1.0;
+        const subscription = player.addListener("playbackStatusUpdate", (status) => {
+          if (status.didJustFinish) {
+            subscription.remove();
+            if (soundRef.current === player) {
+              soundRef.current = null;
             }
-          });
-        } catch {}
-        } catch {}
+            try {
+              player.remove();
+            } catch {}
+          }
+        });
+        player.play();
       } catch {}
-    } catch (error) {
+    } catch {
       // Do not log message content
     }
   };
