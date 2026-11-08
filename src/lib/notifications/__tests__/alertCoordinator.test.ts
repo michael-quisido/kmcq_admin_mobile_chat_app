@@ -74,8 +74,28 @@ describe("alertCoordinator", () => {
   });
 
   it("ignores invalid IDs", () => {
-    notifyNewMessage({ conversationId: 0, messageId: 1, sender: "visitor", muted: false });
-    notifyNewMessage({ conversationId: 1, messageId: 0, sender: "visitor", muted: false });
+    const invalidIds = [0, -1, 1.5, Number.NaN];
+    for (const conversationId of invalidIds) {
+      notifyNewMessage({ conversationId, messageId: 1, sender: "visitor", muted: false });
+    }
+    for (const messageId of invalidIds) {
+      notifyNewMessage({ conversationId: 1, messageId, sender: "visitor", muted: false });
+    }
     expect(playSound).not.toHaveBeenCalled();
+  });
+
+  it("evicts the least recently updated conversation", () => {
+    for (let conversationId = 1; conversationId <= 500; conversationId += 1) {
+      notifyNewMessage({ conversationId, messageId: 1, sender: "agent", muted: false });
+    }
+
+    notifyNewMessage({ conversationId: 1, messageId: 2, sender: "agent", muted: false });
+    notifyNewMessage({ conversationId: 501, messageId: 1, sender: "agent", muted: false });
+
+    notifyNewMessage({ conversationId: 2, messageId: 1, sender: "visitor", muted: false });
+    expect(playSound).toHaveBeenCalledTimes(1);
+
+    notifyNewMessage({ conversationId: 1, messageId: 2, sender: "visitor", muted: false });
+    expect(playSound).toHaveBeenCalledTimes(1);
   });
 });

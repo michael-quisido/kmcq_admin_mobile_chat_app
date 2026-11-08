@@ -1,7 +1,7 @@
 import { isSoundsEnabled } from "./preferences";
 import { playAlertSound } from "./playAlertSound";
 
-type NewMessage = {
+export type NewMessage = {
   conversationId: number;
   messageId: number;
   sender?: string | null;
@@ -23,12 +23,17 @@ function trimWatermarks(): void {
   }
 }
 
+function updateWatermark(conversationId: number, messageId: number): void {
+  watermarks.delete(conversationId);
+  watermarks.set(conversationId, messageId);
+  trimWatermarks();
+}
+
 export function seedConversation(conversationId: number, messageId: number): void {
   if (!validId(conversationId) || !validId(messageId)) return;
   const current = watermarks.get(conversationId) ?? 0;
   if (messageId <= current) return;
-  watermarks.set(conversationId, messageId);
-  trimWatermarks();
+  updateWatermark(conversationId, messageId);
 }
 
 export function notifyNewMessage(message: NewMessage): void {
@@ -38,14 +43,13 @@ export function notifyNewMessage(message: NewMessage): void {
   const current = watermarks.get(conversationId) ?? 0;
   if (messageId <= current) return;
 
-  watermarks.set(conversationId, messageId);
-  trimWatermarks();
+  updateWatermark(conversationId, messageId);
 
   if (message.sender === "agent") return;
   if (message.muted) return;
   if (!isSoundsEnabled()) return;
 
-  void playAlertSound();
+  void playAlertSound().catch(() => {});
 }
 
 export function resetAlertCoordinator(): void {

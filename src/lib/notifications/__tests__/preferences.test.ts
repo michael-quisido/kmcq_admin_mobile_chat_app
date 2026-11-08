@@ -49,4 +49,46 @@ describe("sounds preference", () => {
     expect(isSoundsEnabled()).toBe(false);
     expect(secureStore().setItemAsync).toHaveBeenCalledWith("kmcq_notification_sounds_enabled", "false");
   });
+
+  it("preserves a prior false cache when reading storage fails", async () => {
+    const { loadSoundsEnabled, isSoundsEnabled, setSoundsEnabled } =
+      require("../preferences") as typeof Preferences;
+    await setSoundsEnabled(false);
+    secureStore().getItemAsync.mockRejectedValueOnce(new Error("read failed"));
+    await expect(loadSoundsEnabled()).resolves.toBe(false);
+    expect(isSoundsEnabled()).toBe(false);
+  });
+
+  it("treats a malformed stored value as enabled", async () => {
+    const { loadSoundsEnabled, isSoundsEnabled, setSoundsEnabled } =
+      require("../preferences") as typeof Preferences;
+    await setSoundsEnabled(false);
+    secureStore().__store.set("kmcq_notification_sounds_enabled", "not-a-boolean");
+    await expect(loadSoundsEnabled()).resolves.toBe(true);
+    expect(isSoundsEnabled()).toBe(true);
+  });
+
+  it("keeps the in-memory value when writing storage fails", async () => {
+    const { isSoundsEnabled, setSoundsEnabled } = require("../preferences") as typeof Preferences;
+    secureStore().setItemAsync.mockRejectedValueOnce(new Error("write failed"));
+    await expect(setSoundsEnabled(false)).resolves.toBeUndefined();
+    expect(isSoundsEnabled()).toBe(false);
+  });
+
+  it("does not let an in-flight load overwrite a newer set", async () => {
+    const { loadSoundsEnabled, isSoundsEnabled, setSoundsEnabled } =
+      require("../preferences") as typeof Preferences;
+    let resolveRead!: (value: string | null) => void;
+    const pendingRead = new Promise<string | null>((resolve) => {
+      resolveRead = resolve;
+    });
+    secureStore().getItemAsync.mockImplementationOnce(() => pendingRead);
+
+    const loading = loadSoundsEnabled();
+    await setSoundsEnabled(false);
+    resolveRead("true");
+
+    await expect(loading).resolves.toBe(false);
+    expect(isSoundsEnabled()).toBe(false);
+  });
 });
