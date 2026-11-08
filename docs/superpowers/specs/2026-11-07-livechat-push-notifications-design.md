@@ -188,6 +188,7 @@ Create `src/lib/notifications/`:
   - On first load (`lastMessageIdRef.current === 0`), seed the coordinator with the newest message ID.
   - On later loads, if the newest ID increased, call the coordinator.
 - The push received listener also calls the coordinator with the push's `messageId`.
+- On returning from background/inactive to active, seed the first conversations/messages refresh without ringing; those messages were already announced by the OS notification.
 - Server push uses `systemId` when the first-message auto-greeting was inserted; otherwise `visitorId`. This ensures the push message ID equals the newest message ID the polls will see, so the first message does not ring twice.
 - The coordinator's per-conversation highest-ID watermark makes poll/push order irrelevant.
 - The OS notification is suppressed for real messages in the foreground, so only the in-app sound plays.
@@ -242,7 +243,7 @@ Create `src/lib/notifications/`:
 
 ### 8.1 Dependency
 
-- Add `expo-server-sdk` to `dev_app_nextjs`.
+- Add `expo-server-sdk@^6.1.0` (the newest line compatible with the server's Node 20 runtime; v7+ requires Node 22.12+).
 - Expo Push Service handles FCM/APNs; no FCM server key or APNs key is added to the Next.js server.
 - Optional `EXPO_ACCESS_TOKEN` environment variable is passed to the SDK when set. If Expo push security is enabled in the dashboard, this is required; otherwise the API works without it.
 
@@ -306,11 +307,10 @@ New `lib/livechat/mobile-push.ts`:
       "channelId": "livechat",
       "priority": "high",
       "collapseId": "livechat-conversation-42",
-      "tag": "livechat-conversation-42",
-      "threadId": "livechat-conversation-42"
+      "tag": "livechat-conversation-42"
     }
     ```
-    `sound`, `threadId` target iOS; `channelId`, `tag` target Android; `collapseId` applies to both.
+    `sound` targets iOS; `channelId`, `tag` target Android; `collapseId` applies to both. `threadId` is not sent because the Node-20-compatible SDK v6 types do not expose it.
   - `sendMobileVisitorMessagePush(input)`:
     - Select tokens where the admin has no mute row for the conversation:
       ```sql
@@ -532,7 +532,7 @@ Add `docs/notifications.md` to the mobile repo covering:
 - `src/app/notification-sound.tsx` — sounds toggle, push permission/registration/test UI.
 - `src/lib/notifications/setup.ts`, `setup.web.ts`
 - `src/lib/notifications/notificationData.ts`
-- `src/lib/notifications/push.ts`, `push.web.ts`
+- `src/lib/notifications/push.ts`, `push.web.ts`, `push.types.ts`
 - `src/lib/notifications/preferences.ts`
 - `src/lib/notifications/playAlertSound.ts`
 - `src/lib/notifications/alertCoordinator.ts`
