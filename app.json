@@ -56,7 +56,14 @@
           "enableBackgroundPlayback": false
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "livechat",
+          "sounds": ["./assets/notification_sound/kmcq_gmbh_doorbell.wav"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
