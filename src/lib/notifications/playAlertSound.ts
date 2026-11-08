@@ -6,50 +6,77 @@ import {
 } from "expo-audio";
 import { getCustomSoundInfo } from "./customSound";
 
-let player: AudioPlayer | null = null;
+type PlayerSubscription = ReturnType<AudioPlayer["addListener"]>;
 
-function disposePlayer(): void {
-  if (!player) return;
-  const current = player;
-  player = null;
+type ActiveSound = {
+  player: AudioPlayer;
+  subscription: PlayerSubscription;
+};
+
+let active: ActiveSound | null = null;
+
+function release(
+  targetPlayer: AudioPlayer | null,
+  targetSubscription: PlayerSubscription | null,
+): void {
+  if (active?.player === targetPlayer) {
+    active = null;
+  }
   try {
-    current.remove();
+    targetSubscription?.remove();
+  } catch {
+    // Already released.
+  }
+  try {
+    targetPlayer?.remove();
   } catch {
     // Already released.
   }
 }
 
-async function playSource(source: AudioSource): Promise<boolean> {
+function disposePlayer(): void {
+  if (!active) return;
+  release(active.player, active.subscription);
+}
+
+function getBundledSound(): AudioSource {
+  return require("../../../assets/notification_sound/kmcq-gmbh-doorbell.mp3") as AudioSource;
+}
+
+async function playSource(
+  source: AudioSource,
+  fallbackSource: AudioSource | null,
+): Promise<boolean> {
+  disposePlayer();
+
   let next: AudioPlayer | null = null;
+  let nextSubscription: PlayerSubscription | null = null;
+
   try {
     next = createAudioPlayer(source, { updateInterval: 250 });
-    player = next;
     next.volume = 1.0;
 
-    const subscription = next.addListener("playbackStatusUpdate", (status) => {
-      if (!status.didJustFinish) return;
-      subscription.remove();
-      if (player === next) {
-        player = null;
+    nextSubscription = next.addListener("playbackStatusUpdate", (status) => {
+      if (status.didJustFinish) {
+        release(next, nextSubscription);
+        return;
       }
-      try {
-        next?.remove();
-      } catch {
-        // Already released.
+
+      if (status.error) {
+        const wasCurrent = active?.player === next;
+        release(next, nextSubscription);
+        if (wasCurrent && fallbackSource) {
+          void playSource(fallbackSource, null);
+        }
       }
     });
+
+    active = { player: next, subscription: nextSubscription };
 
     next.play();
     return true;
   } catch {
-    if (player === next) {
-      player = null;
-    }
-    try {
-      next?.remove();
-    } catch {
-      // Already released.
-    }
+    release(next, nextSubscription);
     return false;
   }
 }
@@ -70,7 +97,7 @@ export async function playAlertSound(): Promise<void> {
 
     try {
       const info = await getCustomSoundInfo();
-      if (info.uri && (await playSource({ uri: info.uri }))) {
+      if (info.uri && (await playSource({ uri: info.uri }, getBundledSound()))) {
         return;
       }
     } catch {
@@ -78,8 +105,7 @@ export async function playAlertSound(): Promise<void> {
     }
 
     try {
-      const fallback = require("../../../assets/notification_sound/kmcq-gmbh-doorbell.mp3") as AudioSource;
-      await playSource(fallback);
+      await playSource(getBundledSound(), null);
     } catch {
       // Never let a notification sound break polling.
     }
