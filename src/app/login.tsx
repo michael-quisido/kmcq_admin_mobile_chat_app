@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from "react-native";
 import { router } from "expo-router";
 import api from "../lib/api";
+import { registerForPushIfPermitted } from "../lib/notifications/push";
+import { consumePendingConversationId } from "../lib/notifications/pendingConversation";
 
 export default function LoginScreen() {
   const [step, setStep] = useState<"email" | "code" | "credentials">("email");
@@ -39,7 +41,13 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await api.post("/api/mobile/livechat/auth/login", { email, username, password });
-      router.replace("/livechat");
+      void registerForPushIfPermitted().catch(() => {});
+      const pending = consumePendingConversationId();
+      if (pending) {
+        router.replace({ pathname: "/livechat", params: { conversationId: String(pending) } });
+      } else {
+        router.replace("/livechat");
+      }
     } catch (err: any) {
       Alert.alert("Login Failed", err.response?.data?.error || "Invalid credentials");
     } finally {

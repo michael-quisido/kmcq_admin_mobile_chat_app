@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { router } from "expo-router";
 import api from "../lib/api";
 import { View, ActivityIndicator } from "react-native";
+import { registerForPushIfPermitted } from "../lib/notifications/push";
+import { consumePendingConversationId } from "../lib/notifications/pendingConversation";
 
 export default function Index() {
   useEffect(() => {
@@ -11,9 +13,18 @@ export default function Index() {
   const checkAuth = async () => {
     try {
       await api.get("/api/mobile/livechat/auth/me");
-      router.replace("/livechat");
     } catch {
       router.replace("/login");
+      return;
+    }
+
+    void registerForPushIfPermitted().catch(() => {});
+
+    const pending = consumePendingConversationId();
+    if (pending) {
+      router.replace({ pathname: "/livechat", params: { conversationId: String(pending) } });
+    } else {
+      router.replace("/livechat");
     }
   };
 
