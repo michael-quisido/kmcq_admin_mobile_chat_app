@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import { AndroidImportance } from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 import api from "../api";
@@ -35,7 +36,7 @@ export async function configureNotifications(): Promise<void> {
   try {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: "LiveChat messages",
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: AndroidImportance.HIGH,
       sound: "kmcq_gmbh_doorbell.wav",
       vibrationPattern: [0, 250, 250, 250],
       enableVibrate: true,
@@ -96,6 +97,7 @@ async function registerDeviceToken(): Promise<string | null> {
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {
+  if (!Device.isDevice) return null;
   if ((await requestNotificationPermission()) !== "granted") return null;
   return registerDeviceToken();
 }

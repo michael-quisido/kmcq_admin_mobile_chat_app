@@ -18,4 +18,4 @@ export async function sendTestMobilePush(): Promise<PushTestResult> {
   return { sent: 0, failed: 0, tokens: 0 };
 }
 export function handleNotificationReceived(_notification: unknown): void {}
-export function handleNotificationResponse(_response: unknown): void {}
+export function handleNotificationResponse(_response: unknown, _navigate = true): void {}

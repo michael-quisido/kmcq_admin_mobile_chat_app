@@ -15,7 +15,7 @@ jest.mock("expo-device", () => ({
 }));
 jest.mock("expo-notifications", () => ({
   PermissionStatus: { GRANTED: "granted" },
-  AndroidImportance: { HIGH: 4 },
+  AndroidImportance: { HIGH: 6 },
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
@@ -37,6 +37,7 @@ jest.mock("../../api", () => ({ __esModule: true, default: { post: jest.fn() } }
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 import api from "../../api";
 import { notifyNewMessage } from "../alertCoordinator";
@@ -57,6 +58,10 @@ const getPermissions = jest.mocked(Notifications.getPermissionsAsync);
 const requestPermissions = jest.mocked(Notifications.requestPermissionsAsync);
 const getToken = jest.mocked(Notifications.getExpoPushTokenAsync);
 const setHandler = jest.mocked(Notifications.setNotificationHandler);
+const setChannel = jest.mocked(Notifications.setNotificationChannelAsync);
+const setItem = jest.mocked(SecureStore.setItemAsync);
+const getItem = jest.mocked(SecureStore.getItemAsync);
+const deleteItem = jest.mocked(SecureStore.deleteItemAsync);
 const post = jest.mocked(api.post);
 const push = jest.mocked(router.push);
 const alert = jest.mocked(notifyNewMessage);
@@ -106,9 +111,11 @@ describe("notification permission", () => {
 });
 
 describe("registerForPushNotifications", () => {
-  it("returns null on a simulator without requesting a token", async () => {
+  it("returns null on a simulator without prompting or requesting a token", async () => {
     mockIsDevice = false;
     await expect(registerForPushNotifications()).resolves.toBeNull();
+    expect(getPermissions).not.toHaveBeenCalled();
+    expect(requestPermissions).not.toHaveBeenCalled();
     expect(getToken).not.toHaveBeenCalled();
     expect(post).not.toHaveBeenCalled();
   });
@@ -129,8 +136,9 @@ describe("registerForPushNotifications", () => {
     expect(getToken).toHaveBeenCalledWith({ projectId: "test-project-id" });
     expect(post).toHaveBeenCalledWith("/api/mobile/livechat/push/register", {
       token: "ExponentPushToken[unit]",
-      platform: Platform.OS === "android" ? "android" : "ios",
+      platform: "ios",
     });
+    expect(setItem).toHaveBeenCalledWith("kmcq_expo_push_token", "ExponentPushToken[unit]");
   });
 
   it("returns null if server registration fails", async () => {
@@ -174,6 +182,18 @@ describe("unregisterForPushNotifications", () => {
     post.mockRejectedValueOnce(new Error("offline"));
     await expect(unregisterForPushNotifications("ExponentPushToken[unit]")).resolves.toBeUndefined();
   });
+
+  it("uses the stored token when none is passed", async () => {
+    getItem.mockResolvedValueOnce("ExponentPushToken[stored]" as never);
+
+    await unregisterForPushNotifications();
+
+    expect(getItem).toHaveBeenCalledWith("kmcq_expo_push_token");
+    expect(post).toHaveBeenCalledWith("/api/mobile/livechat/push/unregister", {
+      token: "ExponentPushToken[stored]",
+    });
+    expect(deleteItem).toHaveBeenCalledWith("kmcq_expo_push_token");
+  });
 });
 
 describe("sendTestMobilePush", () => {
@@ -214,6 +234,24 @@ describe("configureNotifications", () => {
       shouldSetBadge: false,
     });
   });
+
+  it("configures the Android livechat channel with the doorbell sound", async () => {
+    const platform = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      await configureNotifications();
+    } finally {
+      platform.restore();
+    }
+
+    expect(setChannel).toHaveBeenCalledWith(
+      "livechat",
+      expect.objectContaining({
+        sound: "kmcq_gmbh_doorbell.wav",
+        importance: 6,
+      }),
+    );
+    expect(Platform.OS).toBe("ios");
+  });
 });
 
 describe("handleNotificationResponse", () => {
@@ -242,6 +280,33 @@ describe("handleNotificationResponse", () => {
     handleNotificationResponse(null);
 
     expect(consumePendingConversationId()).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("routes a test notification to the notification sound screen", () => {
+    handleNotificationResponse({
+      notification: { request: { content: { data: { type: "test" } } } },
+    } as never);
+
+    expect(push).toHaveBeenCalledWith("/notification-sound");
+    expect(consumePendingConversationId()).toBeNull();
+  });
+
+  it("stores a livechat conversation without navigating when navigate is false", () => {
+    handleNotificationResponse(
+      {
+        notification: {
+          request: {
+            content: {
+              data: { type: "livechat_message", conversationId: 42, messageId: 99 },
+            },
+          },
+        },
+      } as never,
+      false,
+    );
+
+    expect(consumePendingConversationId()).toBe(42);
     expect(push).not.toHaveBeenCalled();
   });
 });
