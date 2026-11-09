@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "@jest/globals";
 import {
+  clearPendingConversationId,
   consumePendingConversationId,
   setPendingConversationId,
 } from "../pendingConversation";
@@ -22,6 +23,17 @@ describe("pendingConversation", () => {
     setPendingConversationId(-3);
     setPendingConversationId(1.25);
     expect(consumePendingConversationId()).toBe(7);
+    expect(consumePendingConversationId()).toBeNull();
+  });
+
+  it("clears a pending ID without returning it", () => {
+    setPendingConversationId(42);
+    clearPendingConversationId();
+    expect(consumePendingConversationId()).toBeNull();
+  });
+
+  it("clears safely when nothing is pending", () => {
+    clearPendingConversationId();
     expect(consumePendingConversationId()).toBeNull();
   });
 });

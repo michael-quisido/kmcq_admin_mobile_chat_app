@@ -149,13 +149,12 @@ export function handleNotificationResponse(
   const data = response.notification.request.content.data;
   const livechat = parseLivechatMessageData(data);
   if (livechat) {
+    setPendingConversationId(livechat.conversationId);
     if (navigate) {
       router.push({
         pathname: "/livechat",
         params: { conversationId: String(livechat.conversationId) },
       });
-    } else {
-      setPendingConversationId(livechat.conversationId);
     }
     return;
   }

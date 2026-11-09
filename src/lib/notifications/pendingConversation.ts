@@ -11,3 +11,7 @@ export function consumePendingConversationId(): number | null {
   pendingConversationId = null;
   return id;
 }
+
+export function clearPendingConversationId(): void {
+  pendingConversationId = null;
+}
