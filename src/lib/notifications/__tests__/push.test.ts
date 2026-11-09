@@ -255,7 +255,7 @@ describe("configureNotifications", () => {
 });
 
 describe("handleNotificationResponse", () => {
-  it("stores the conversation and routes to it", () => {
+  it("routes to the conversation without storing pending state on a live tap", () => {
     handleNotificationResponse({
       notification: {
         request: {
@@ -266,7 +266,7 @@ describe("handleNotificationResponse", () => {
       },
     } as never);
 
-    expect(consumePendingConversationId()).toBe(42);
+    expect(consumePendingConversationId()).toBeNull();
     expect(push).toHaveBeenCalledWith({
       pathname: "/livechat",
       params: { conversationId: "42" },
