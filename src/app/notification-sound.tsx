@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, Linking } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Switch, Linking, Platform, AppState, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { File } from "expo-file-system";
@@ -55,6 +55,22 @@ export default function NotificationSoundScreen() {
       loadSoundsEnabled().then(setSounds).catch(() => {});
     }, []),
   );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        getNotificationPermission().then(setPermission).catch(() => {});
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const openSystemSettings = () => {
+    if (Platform.OS === "web") return;
+    void Linking.openSettings().catch(() => {});
+  };
 
   const pickSound = async () => {
     setPicking(true);
@@ -166,10 +182,16 @@ export default function NotificationSoundScreen() {
       const status = await requestNotificationPermission();
       setPermission(status);
       if (status !== "granted") {
-        Alert.alert("Notifications disabled", "Enable notifications in system settings.", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open settings", onPress: () => Linking.openSettings() },
-        ]);
+        Alert.alert(
+          "Notifications disabled",
+          "Enable notifications in system settings.",
+          Platform.OS !== "web"
+            ? [
+                { text: "Cancel", style: "cancel" },
+                { text: "Open settings", onPress: openSystemSettings },
+              ]
+            : [{ text: "Cancel", style: "cancel" }],
+        );
         return;
       }
       const token = await registerForPushNotifications();
@@ -216,7 +238,7 @@ export default function NotificationSoundScreen() {
         <View style={styles.headerButton} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {loading ? (
           <ActivityIndicator size="large" color="#2563eb" />
         ) : (
@@ -247,9 +269,11 @@ export default function NotificationSoundScreen() {
               <TouchableOpacity style={styles.buttonSecondary} onPress={sendTest} disabled={testing}>
                 <Text style={styles.buttonSecondaryText}>{testing ? "Sending..." : "Send test notification"}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.buttonSecondary} onPress={() => Linking.openSettings()}>
-                <Text style={styles.buttonSecondaryText}>Open system settings</Text>
-              </TouchableOpacity>
+              {Platform.OS !== "web" && (
+                <TouchableOpacity style={styles.buttonSecondary} onPress={openSystemSettings}>
+                  <Text style={styles.buttonSecondaryText}>Open system settings</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.section}>
@@ -275,7 +299,7 @@ export default function NotificationSoundScreen() {
             </TouchableOpacity>
           </>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -286,7 +310,8 @@ const styles = StyleSheet.create({
   headerButton: { minWidth: 60, alignItems: "center" },
   backText: { color: "white", fontSize: 20, fontWeight: "bold" },
   headerTitle: { color: "white", fontSize: 18, fontWeight: "bold", flex: 1, textAlign: "center" },
-  content: { padding: 15 },
+  content: { flex: 1 },
+  contentContainer: { padding: 15 },
   section: { backgroundColor: "white", padding: 15, borderRadius: 8, marginBottom: 15 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   label: { fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 6 },
