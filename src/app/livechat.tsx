@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal, AppState } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import api from "../lib/api";
 import { notifyNewMessage, seedConversation } from "../lib/notifications/alertCoordinator";
 import { consumePendingConversationId, clearPendingConversationId } from "../lib/notifications/pendingConversation";
@@ -49,18 +49,24 @@ export default function LiveChatScreen() {
   const retryTimeoutsRef = useRef<{ conversations?: any; agents?: any }>({});
   const params = useLocalSearchParams<{ conversationId?: string }>();
 
-  useEffect(() => {
-    const raw = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
-    if (!raw || handledParamRef.current === raw) return;
+  useFocusEffect(
+    useCallback(() => {
+      const raw = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
+      if (!raw) {
+        handledParamRef.current = null;
+        return;
+      }
+      if (handledParamRef.current === raw) return;
 
-    const id = Number(raw);
-    if (!authOk || loading || !Number.isInteger(id) || id <= 0) return;
+      const id = Number(raw);
+      if (!authOk || loading || !Number.isInteger(id) || id <= 0) return;
 
-    handledParamRef.current = raw;
-    consumePendingConversationId();
-    setSelectedConversation(id);
-    router.setParams({ conversationId: undefined });
-  }, [params.conversationId, loading, authOk]);
+      handledParamRef.current = raw;
+      consumePendingConversationId();
+      setSelectedConversation(id);
+      router.setParams({ conversationId: undefined });
+    }, [params.conversationId, loading, authOk]),
+  );
 
   const scheduleRetry = (key: "conversations" | "agents", fn: () => Promise<void>) => {
     if (retryTimeoutsRef.current[key]) return;
@@ -496,7 +502,7 @@ export default function LiveChatScreen() {
           <View style={styles.headerRight}>
             <TouchableOpacity onPress={toggleMute} style={styles.headerButton}>
               <Text style={styles.logoutText}>
-                {conversationsRef.current.find((c) => c.id === selectedConversation)?.muted
+                {conversations.find((c) => c.id === selectedConversation)?.muted
                   ? "Unmute"
                   : "Mute"}
               </Text>
