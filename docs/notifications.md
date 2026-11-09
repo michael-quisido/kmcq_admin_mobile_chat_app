@@ -2,16 +2,9 @@
 
 ## How alerts work
 
-Foreground alerts are detected by the existing 5-second conversation poll and by Expo's
-foreground notification listener. The app compares the newest message ID per
-conversation with an in-memory watermark, then plays the shared doorbell once. The same
-coordinator receives background push taps, so a message cannot ring twice even if the
-push arrives at the same time as a poll. For real messages in the foreground the OS
-banner is suppressed; only the in-app sound plays.
+Foreground alerts are detected by the 5-second conversation poll, the 2-second open-conversation poll, and Expo's foreground notification listener. The app compares the newest message ID per conversation with an in-memory watermark and plays the shared doorbell once. After a background or terminated push tap, the first load seeds the current message IDs instead of ringing, so reopening a conversation does not replay old messages. For real messages in the foreground the OS banner is suppressed; only the in-app sound plays.
 
-Background and terminated alerts use Expo Push. The server sends one notification to all
-active tokens for an admin. It does not send another when the visitor's own client is in
-the foreground, and it skips admins who muted the conversation.
+Background and terminated alerts use Expo Push. The server builds one Expo message per active token across non-muted admins. Mobile push is sent regardless of whether the visitor or admin is in the foreground; foreground banner suppression is handled client-side. It skips admins who muted the conversation.
 
 Push payloads contain:
 
@@ -19,13 +12,12 @@ Push payloads contain:
 - body: the visitor display name
 - data: `{ "type": "livechat_message", "conversationId": 12, "messageId": 345 }`
 
-The message body is never included in a push payload.
+Expo mobile push payloads never include the message body. The separate Web Push path can still include a short visitor message preview, and Web Push does not currently honor conversation mutes.
 
 ## Muting
 
 Mute is per admin and per conversation. It is stored in
-`livechat_mobile_conversation_mutes`. Muting suppresses both foreground and background
-sound for that admin. Unread counts keep updating.
+`livechat_mobile_conversation_mutes`. For Expo mobile push, muting suppresses foreground sound and server push delivery for that admin. Unread counts keep updating. Web Push does not currently honor conversation mutes.
 
 ## Foreground sound
 
@@ -33,9 +25,7 @@ The foreground sound uses the custom file selected on the Notification Sound scr
 falls back to the bundled `kmcq_gmbh_doorbell.mp3`. The separate "In-app sounds" switch
 controls foreground playback only.
 
-Android notification channel sound is fixed when the channel is created. If a user changes
-the channel sound in Android system settings, reinstalling the app is the only way to
-restore the channel default.
+Android notification channel sound is fixed when the channel is created. If a user changes the channel sound in Android system settings, recreating the channel requires uninstalling/reinstalling the app or clearing app data.
 
 iOS background push sounds must be bundled files (`wav`, `caf`, or `aiff`). A user-picked
 sound applies to foreground playback only; changing a remote push sound would require a
@@ -59,8 +49,7 @@ Production push delivery needs EAS project credentials:
 push is `assets/notification_sound/kmcq_gmbh_doorbell.wav`; the hyphenated MP3 remains the
 foreground fallback. Android resource names cannot contain hyphens.
 
-Registering a token happens after authentication on the startup screen and after a
-successful login. Logout unregisters the device token.
+After authentication, startup and login register a token only if notification permission is already granted. A fresh install must open Notification Sound and tap "Enable push notifications" to request permission and register. Logout unregisters the device token.
 
 ## Verification
 
@@ -72,11 +61,13 @@ npx tsc --noEmit
 npx expo install --check
 npx expo-doctor
 
-# server
-cd "/home/mike_q/Downloads/Apps/KMCQ GmbH/dev_app_nextjs"
+# server (run from the server repo)
+source ~/.nvm/nvm.sh && nvm use 20 >/dev/null
 npm test
 npx tsc --noEmit
 ```
+
+Remote push checks require a development or production build. Expo Go on Android cannot receive remote push.
 
 Manual device checks:
 
