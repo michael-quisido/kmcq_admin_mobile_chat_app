@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal, AppState } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import api from "../lib/api";
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer, type AudioSource } from "expo-audio";
-import { getCustomSoundInfo } from "../lib/notifications/customSound";
+import { notifyNewMessage, seedConversation } from "../lib/notifications/alertCoordinator";
+import { consumePendingConversationId, clearPendingConversationId } from "../lib/notifications/pendingConversation";
+import { registerForPushIfPermitted, unregisterForPushNotifications } from "../lib/notifications/push";
 
 interface Conversation {
   id: number;
   visitorName: string;
   visitorEmail: string;
   lastMessagePreview?: string;
+  lastMessageId?: number | null;
+  lastMessageSender?: string | null;
   unreadCount?: number;
   status?: string;
+  muted?: boolean;
 }
 
 interface Message {
@@ -29,15 +33,34 @@ export default function LiveChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [authOk, setAuthOk] = useState(false);
   const [sending, setSending] = useState(false);
   const [agents, setAgents] = useState<any[]>([]);
   const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const lastMessageIdRef = useRef<number>(0);
-  const soundRef = useRef<AudioPlayer | null>(null);
+  const firstConversationLoadRef = useRef(true);
+  const firstMessageLoadRef = useRef(true);
+  const conversationsRef = useRef<Conversation[]>([]);
   const selectedConversationRef = useRef<number | null>(null);
+  const handledParamRef = useRef<string | null>(null);
+  const pushRegistrationAttemptedRef = useRef(false);
   const inFlightRef = useRef({ conversations: false, agents: false, messages: false });
   const retryTimeoutsRef = useRef<{ conversations?: any; agents?: any }>({});
+  const params = useLocalSearchParams<{ conversationId?: string }>();
+
+  useEffect(() => {
+    const raw = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
+    if (!raw || handledParamRef.current === raw) return;
+
+    const id = Number(raw);
+    if (!authOk || loading || !Number.isInteger(id) || id <= 0) return;
+
+    handledParamRef.current = raw;
+    consumePendingConversationId();
+    setSelectedConversation(id);
+    router.setParams({ conversationId: undefined });
+  }, [params.conversationId, loading, authOk]);
 
   const scheduleRetry = (key: "conversations" | "agents", fn: () => Promise<void>) => {
     if (retryTimeoutsRef.current[key]) return;
@@ -61,6 +84,9 @@ export default function LiveChatScreen() {
     }, 5000);
     const appStateSub = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
+        firstConversationLoadRef.current = true;
+        firstMessageLoadRef.current = true;
+        pushRegistrationAttemptedRef.current = false;
         checkAuth().catch(() => {});
         loadConversations().catch(() => {});
         loadAgents().catch(() => {});
@@ -74,12 +100,6 @@ export default function LiveChatScreen() {
       appStateSub.remove();
       if (retryTimeoutsRef.current.conversations) clearTimeout(retryTimeoutsRef.current.conversations);
       if (retryTimeoutsRef.current.agents) clearTimeout(retryTimeoutsRef.current.agents);
-      if (soundRef.current) {
-        try {
-          soundRef.current.remove();
-        } catch {}
-        soundRef.current = null;
-      }
     };
   }, []);
 
@@ -87,6 +107,7 @@ export default function LiveChatScreen() {
     selectedConversationRef.current = selectedConversation;
     if (selectedConversation) {
       lastMessageIdRef.current = 0;
+      firstMessageLoadRef.current = true;
       loadMessages(selectedConversation);
       const interval = setInterval(() => {
         if (selectedConversationRef.current) {
@@ -96,14 +117,21 @@ export default function LiveChatScreen() {
       return () => clearInterval(interval);
     } else {
       lastMessageIdRef.current = 0;
+      firstMessageLoadRef.current = true;
     }
   }, [selectedConversation]);
 
   const checkAuth = async () => {
     try {
       await api.get("/api/mobile/livechat/auth/me");
+      setAuthOk(true);
+      if (!pushRegistrationAttemptedRef.current) {
+        pushRegistrationAttemptedRef.current = true;
+        void registerForPushIfPermitted();
+      }
       return true;
     } catch (error: any) {
+      setAuthOk(false);
       const status = error?.response?.status;
       if (status === 401 || status === 403) {
         router.replace("/login");
@@ -140,7 +168,26 @@ export default function LiveChatScreen() {
     inFlightRef.current.conversations = true;
     try {
       const res = await api.get("/api/mobile/livechat/conversations");
-      setConversations(Array.isArray(res.data) ? res.data : []);
+      const list: Conversation[] = Array.isArray(res.data) ? res.data : [];
+      const first = firstConversationLoadRef.current;
+      firstConversationLoadRef.current = false;
+
+      for (const conversation of list) {
+        if (!conversation.lastMessageId) continue;
+        if (first) {
+          seedConversation(conversation.id, conversation.lastMessageId);
+        } else {
+          notifyNewMessage({
+            conversationId: conversation.id,
+            messageId: conversation.lastMessageId,
+            sender: conversation.lastMessageSender,
+            muted: conversation.muted,
+          });
+        }
+      }
+
+      conversationsRef.current = list;
+      setConversations(list);
       if (retryTimeoutsRef.current.conversations) {
         clearTimeout(retryTimeoutsRef.current.conversations);
         retryTimeoutsRef.current.conversations = undefined;
@@ -158,75 +205,28 @@ export default function LiveChatScreen() {
     }
   };
 
-  const playNotificationSound = async () => {
-    try {
-      try {
-        await setAudioModeAsync({
-          playsInSilentMode: true,
-          interruptionMode: "duckOthers",
-          allowsRecording: false,
-          shouldRouteThroughEarpiece: false,
-        });
-      } catch {}
-      try {
-        if (soundRef.current) {
-          try {
-            soundRef.current.remove();
-          } catch {}
-          soundRef.current = null;
-        }
-        let source: AudioSource | null = null;
-        try {
-          const info = await getCustomSoundInfo();
-          if (info.uri) {
-            source = { uri: info.uri };
-          }
-        } catch {}
-        if (!source) {
-          try {
-            source = require("../../assets/notification_sound/kmcq-gmbh-doorbell.mp3");
-          } catch {}
-        }
-        if (!source) return;
-        const player = createAudioPlayer(source, { updateInterval: 250 });
-        soundRef.current = player;
-        player.volume = 1.0;
-        const subscription = player.addListener("playbackStatusUpdate", (status) => {
-          if (status.didJustFinish) {
-            subscription.remove();
-            if (soundRef.current === player) {
-              soundRef.current = null;
-            }
-            try {
-              player.remove();
-            } catch {}
-          }
-        });
-        player.play();
-      } catch {}
-    } catch {
-      // Do not log message content
-    }
-  };
-
   const loadMessages = async (conversationId: number) => {
     if (inFlightRef.current.messages) return;
     inFlightRef.current.messages = true;
     try {
       const res = await api.get(`/api/mobile/livechat/conversations/${conversationId}`);
-      const newMessages = Array.isArray(res.data?.messages) ? res.data.messages : [];
-      if (newMessages.length > 0) {
-        const latestId = newMessages[newMessages.length - 1].id;
-        if (lastMessageIdRef.current > 0 && latestId > lastMessageIdRef.current) {
-          const latestMsg = newMessages[newMessages.length - 1];
-          if (latestMsg.sender === "visitor" || latestMsg.sender === "system") {
-            playNotificationSound();
-          }
-        }
-        lastMessageIdRef.current = latestId;
-      } else {
-        lastMessageIdRef.current = 0;
+      const newMessages: Message[] = Array.isArray(res.data?.messages) ? res.data.messages : [];
+      const latest = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
+      const latestId = latest?.id ?? 0;
+
+      if (firstMessageLoadRef.current) {
+        if (latestId > 0) seedConversation(conversationId, latestId);
+        firstMessageLoadRef.current = false;
+      } else if (latest && lastMessageIdRef.current > 0 && latestId > lastMessageIdRef.current) {
+        notifyNewMessage({
+          conversationId,
+          messageId: latestId,
+          sender: latest.sender,
+          muted: conversationsRef.current.find((c) => c.id === conversationId)?.muted,
+        });
       }
+
+      lastMessageIdRef.current = latestId;
       setMessages((prev) => {
         if (prev.length === newMessages.length) {
           const same = prev.every((m, i) => m.id === newMessages[i]?.id && m.body === newMessages[i]?.body);
@@ -241,6 +241,11 @@ export default function LiveChatScreen() {
       const status = error?.response?.status;
       if (status === 401 || status === 403) {
         router.replace("/login");
+        return;
+      }
+      if (status === 404) {
+        setSelectedConversation(null);
+        loadConversations();
         return;
       }
     } finally {
@@ -315,6 +320,25 @@ export default function LiveChatScreen() {
     }
   };
 
+  const toggleMute = async () => {
+    if (!selectedConversation) return;
+    const current = conversationsRef.current.find((c) => c.id === selectedConversation);
+    const nextMuted = !current?.muted;
+    try {
+      await api.patch(`/api/mobile/livechat/conversations/${selectedConversation}`, {
+        muted: nextMuted,
+      });
+      const updated = conversationsRef.current.map((c) =>
+        c.id === selectedConversation ? { ...c, muted: nextMuted } : c,
+      );
+      conversationsRef.current = updated;
+      setConversations(updated);
+      loadConversations();
+    } catch (error: any) {
+      Alert.alert("Error", error.response?.data?.error || "Failed to update mute");
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || sending) return;
     if (agents.length === 0) {
@@ -340,6 +364,10 @@ export default function LiveChatScreen() {
   };
 
   const handleLogout = async () => {
+    try {
+      await unregisterForPushNotifications();
+    } catch {}
+    clearPendingConversationId();
     try {
       await api.post("/api/mobile/livechat/auth/logout");
       router.replace("/login");
@@ -394,6 +422,7 @@ export default function LiveChatScreen() {
                   {(item.visitorName || item.visitorEmail || "Unknown User") + ""}
                 </Text>
                 {item.status === "closed" && <Text style={{ fontSize: 12, color: "#d33", marginTop: 2 }}>Closed</Text>}
+                {item.muted && <Text style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Muted</Text>}
                 {item.lastMessagePreview ? (
                   <Text style={styles.conversationPreview} numberOfLines={1}>
                     {item.lastMessagePreview}
@@ -464,9 +493,18 @@ export default function LiveChatScreen() {
             <Text style={styles.backText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle} numberOfLines={1}>Chat</Text>
-          <TouchableOpacity onPress={closeConversation} style={styles.headerButton}>
-            <Text style={styles.logoutText}>Close</Text>
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={toggleMute} style={styles.headerButton}>
+              <Text style={styles.logoutText}>
+                {conversationsRef.current.find((c) => c.id === selectedConversation)?.muted
+                  ? "Unmute"
+                  : "Mute"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={closeConversation} style={styles.headerButton}>
+              <Text style={styles.logoutText}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       
       <KeyboardAvoidingView 
@@ -569,6 +607,10 @@ const styles = StyleSheet.create({
   },
   headerButton: {
     minWidth: 60,
+    alignItems: "center",
+  },
+  headerRight: {
+    flexDirection: "row",
     alignItems: "center",
   },
   menuIcon: {
