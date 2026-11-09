@@ -3,21 +3,10 @@ import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Activity
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import api from "../lib/api";
+import { Conversation, fetchConversations } from "../lib/livechat/conversations";
 import { notifyNewMessage, seedConversation } from "../lib/notifications/alertCoordinator";
 import { consumePendingConversationId, clearPendingConversationId } from "../lib/notifications/pendingConversation";
 import { registerForPushIfPermitted, unregisterForPushNotifications } from "../lib/notifications/push";
-
-interface Conversation {
-  id: number;
-  visitorName: string;
-  visitorEmail: string;
-  lastMessagePreview?: string;
-  lastMessageId?: number | null;
-  lastMessageSender?: string | null;
-  unreadCount?: number;
-  status?: string;
-  muted?: boolean;
-}
 
 interface Message {
   id: number;
@@ -33,6 +22,7 @@ export default function LiveChatScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [conversationsError, setConversationsError] = useState(false);
   const [authOk, setAuthOk] = useState(false);
   const [sending, setSending] = useState(false);
   const [agents, setAgents] = useState<any[]>([]);
@@ -173,8 +163,18 @@ export default function LiveChatScreen() {
     if (inFlightRef.current.conversations) return;
     inFlightRef.current.conversations = true;
     try {
-      const res = await api.get("/api/mobile/livechat/conversations");
-      const list: Conversation[] = Array.isArray(res.data) ? res.data : [];
+      const result = await fetchConversations();
+      if (result.status === "unauthorized") {
+        router.replace("/login");
+        return;
+      }
+      if (result.status === "error") {
+        setConversationsError(true);
+        scheduleRetry("conversations", loadConversations);
+        return;
+      }
+
+      const list = result.conversations;
       const first = firstConversationLoadRef.current;
       firstConversationLoadRef.current = false;
 
@@ -194,21 +194,30 @@ export default function LiveChatScreen() {
 
       conversationsRef.current = list;
       setConversations(list);
+      setConversationsError(false);
       if (retryTimeoutsRef.current.conversations) {
         clearTimeout(retryTimeoutsRef.current.conversations);
         retryTimeoutsRef.current.conversations = undefined;
       }
-    } catch (error: any) {
-      const status = error?.response?.status;
-      if (status === 401 || status === 403) {
-        router.replace("/login");
-        return;
-      }
+    } catch {
+      setConversationsError(true);
       scheduleRetry("conversations", loadConversations);
     } finally {
       setLoading(false);
       inFlightRef.current.conversations = false;
     }
+  };
+
+  const retryConversations = () => {
+    if (retryTimeoutsRef.current.conversations) {
+      clearTimeout(retryTimeoutsRef.current.conversations);
+      retryTimeoutsRef.current.conversations = undefined;
+    }
+    setConversationsError(false);
+    if (conversationsRef.current.length === 0) {
+      setLoading(true);
+    }
+    loadConversations();
   };
 
   const loadMessages = async (conversationId: number) => {
@@ -402,6 +411,14 @@ export default function LiveChatScreen() {
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
+        {conversationsError && conversations.length > 0 ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>Could not refresh conversations.</Text>
+            <TouchableOpacity onPress={retryConversations}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         <FlatList
           data={conversations}
           keyExtractor={(item) => item.id.toString()}
@@ -443,7 +460,19 @@ export default function LiveChatScreen() {
             </TouchableOpacity>
           )}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No conversations yet</Text>
+            conversationsError ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>Could not load conversations</Text>
+                <Text style={styles.emptyDescription}>
+                  Check your connection and try again.
+                </Text>
+                <TouchableOpacity style={styles.retryButton} onPress={retryConversations}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>No conversations yet</Text>
+            )
           }
         />
         <Modal
@@ -661,6 +690,54 @@ const styles = StyleSheet.create({
     marginTop: 50,
     color: "#666",
     fontSize: 16,
+  },
+  emptyState: {
+    alignItems: "center",
+    marginTop: 50,
+    paddingHorizontal: 24,
+  },
+  emptyTitle: {
+    color: "#333",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  emptyDescription: {
+    color: "#666",
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: "#040f2d",
+    borderRadius: 8,
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  errorBanner: {
+    alignItems: "center",
+    backgroundColor: "#fff4e5",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  errorBannerText: {
+    color: "#7a4b00",
+    flex: 1,
+    fontSize: 13,
+  },
+  retryText: {
+    color: "#040f2d",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 12,
   },
   messagesContainer: {
     padding: 10,
