@@ -9,16 +9,27 @@ import { loadSoundsEnabled } from "./preferences";
 
 export function initialiseNotifications(): () => void {
   void loadSoundsEnabled();
-  void configureNotifications();
+  configureNotifications().catch(() => {});
 
-  const lastResponse = Notifications.getLastNotificationResponse();
-  if (lastResponse) {
-    handleNotificationResponse(lastResponse, false);
-    Notifications.clearLastNotificationResponse();
+  try {
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse) {
+      handleNotificationResponse(lastResponse, false);
+      Notifications.clearLastNotificationResponse();
+    }
+  } catch {
+    // Some runtimes cannot read the last notification response.
   }
 
   const received = Notifications.addNotificationReceivedListener(handleNotificationReceived);
-  const response = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+  const response = Notifications.addNotificationResponseReceivedListener((notificationResponse) => {
+    handleNotificationResponse(notificationResponse);
+    try {
+      Notifications.clearLastNotificationResponse();
+    } catch {
+      // Clearing the last response is best effort.
+    }
+  });
   let token: ReturnType<typeof Notifications.addPushTokenListener> | null = null;
   try {
     token = Notifications.addPushTokenListener(() => {
