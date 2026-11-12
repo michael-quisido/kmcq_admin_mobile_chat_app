@@ -7,6 +7,7 @@ import { Conversation, fetchConversations } from "../lib/livechat/conversations"
 import { notifyNewMessage, seedConversation } from "../lib/notifications/alertCoordinator";
 import { consumePendingConversationId, clearPendingConversationId } from "../lib/notifications/pendingConversation";
 import { registerForPushIfPermitted, unregisterForPushNotifications } from "../lib/notifications/push";
+import { clearLivechatConversationBubble } from "../lib/notifications/livechatBubbles";
 
 interface Message {
   id: number;
@@ -308,10 +309,12 @@ export default function LiveChatScreen() {
         text: "Close",
         style: "destructive",
         onPress: async () => {
+          const conversationId = selectedConversation;
           try {
-            await api.patch(`/api/mobile/livechat/conversations/${selectedConversation}`, {
+            await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
               status: "closed",
             });
+            await clearLivechatConversationBubble(conversationId);
             setSelectedConversation(null);
             loadConversations();
             Alert.alert("Success", "Conversation closed");
@@ -343,6 +346,9 @@ export default function LiveChatScreen() {
       await api.patch(`/api/mobile/livechat/conversations/${selectedConversation}`, {
         muted: nextMuted,
       });
+      if (nextMuted) {
+        await clearLivechatConversationBubble(selectedConversation);
+      }
       const updated = conversationsRef.current.map((c) =>
         c.id === selectedConversation ? { ...c, muted: nextMuted } : c,
       );

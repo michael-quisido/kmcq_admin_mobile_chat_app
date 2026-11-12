@@ -7,7 +7,12 @@ import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 import api from "../api";
 import { notifyNewMessage } from "./alertCoordinator";
-import { parseLivechatMessageData, parseTestNotificationData } from "./notificationData";
+import { clearAllLivechatBubbles } from "./livechatBubbles";
+import {
+  parseLivechatDeepLink,
+  parseLivechatMessageData,
+  parseTestNotificationData,
+} from "./notificationData";
 import { setPendingConversationId } from "./pendingConversation";
 import type { NotificationPermission, PushTestResult } from "./push.types";
 
@@ -109,6 +114,12 @@ export async function registerForPushIfPermitted(): Promise<string | null> {
 
 export async function unregisterForPushNotifications(explicitToken?: string): Promise<void> {
   try {
+    await clearAllLivechatBubbles();
+  } catch {
+    // Never block logout on local notification cleanup.
+  }
+
+  try {
     const token = explicitToken ?? (await SecureStore.getItemAsync(PUSH_TOKEN_KEY));
     if (!token) return;
 
@@ -161,5 +172,18 @@ export function handleNotificationResponse(
 
   if (navigate && parseTestNotificationData(data)) {
     router.push("/notification-sound");
+  }
+}
+
+export function handleLivechatDeepLink(url: string | null, navigate = true): void {
+  const conversationId = parseLivechatDeepLink(url);
+  if (conversationId === null) return;
+
+  setPendingConversationId(conversationId);
+  if (navigate) {
+    router.push({
+      pathname: "/livechat",
+      params: { conversationId: String(conversationId) },
+    });
   }
 }

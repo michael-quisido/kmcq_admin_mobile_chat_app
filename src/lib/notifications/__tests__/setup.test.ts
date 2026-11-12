@@ -7,8 +7,13 @@ jest.mock("expo-notifications", () => ({
   addNotificationResponseReceivedListener: jest.fn(),
   addPushTokenListener: jest.fn(),
 }));
+jest.mock("expo-linking", () => ({
+  getInitialURL: jest.fn(),
+  addEventListener: jest.fn(),
+}));
 jest.mock("../push", () => ({
   configureNotifications: jest.fn(),
+  handleLivechatDeepLink: jest.fn(),
   handleNotificationReceived: jest.fn(),
   handleNotificationResponse: jest.fn(),
   registerForPushIfPermitted: jest.fn(),
@@ -17,9 +22,11 @@ jest.mock("../preferences", () => ({
   loadSoundsEnabled: jest.fn(),
 }));
 
+import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import {
   configureNotifications,
+  handleLivechatDeepLink,
   handleNotificationReceived,
   handleNotificationResponse,
   registerForPushIfPermitted,
@@ -32,17 +39,22 @@ const clearLastResponse = jest.mocked(Notifications.clearLastNotificationRespons
 const addReceivedListener = jest.mocked(Notifications.addNotificationReceivedListener);
 const addResponseListener = jest.mocked(Notifications.addNotificationResponseReceivedListener);
 const addTokenListener = jest.mocked(Notifications.addPushTokenListener);
+const getInitialUrl = jest.mocked(Linking.getInitialURL);
+const addUrlListener = jest.mocked(Linking.addEventListener);
 const configure = jest.mocked(configureNotifications);
 const loadSounds = jest.mocked(loadSoundsEnabled);
 const handleReceived = jest.mocked(handleNotificationReceived);
 const handleResponse = jest.mocked(handleNotificationResponse);
+const handleDeepLink = jest.mocked(handleLivechatDeepLink);
 const registerIfPermitted = jest.mocked(registerForPushIfPermitted);
 
 type ResponseListener = Parameters<typeof Notifications.addNotificationResponseReceivedListener>[0];
 type TokenListener = Parameters<typeof Notifications.addPushTokenListener>[0];
+type UrlListener = Parameters<typeof Linking.addEventListener>[1];
 
 let responseListener: ResponseListener | null = null;
 let tokenListener: TokenListener | null = null;
+let urlListener: UrlListener | null = null;
 
 function subscription() {
   return { remove: jest.fn() };
@@ -52,7 +64,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   responseListener = null;
   tokenListener = null;
+  urlListener = null;
   getLastResponse.mockReturnValue(null);
+  getInitialUrl.mockResolvedValue(null);
   configure.mockResolvedValue(undefined);
   loadSounds.mockResolvedValue(true);
   addReceivedListener.mockReturnValue(subscription() as never);
@@ -64,6 +78,10 @@ beforeEach(() => {
     tokenListener = listener;
     return subscription() as never;
   });
+  addUrlListener.mockImplementation((_event, listener) => {
+    urlListener = listener;
+    return subscription() as never;
+  });
 });
 
 describe("initialiseNotifications", () => {
@@ -71,9 +89,11 @@ describe("initialiseNotifications", () => {
     const received = subscription();
     const response = subscription();
     const token = subscription();
+    const url = subscription();
     addReceivedListener.mockReturnValue(received as never);
     addResponseListener.mockReturnValue(response as never);
     addTokenListener.mockReturnValue(token as never);
+    addUrlListener.mockReturnValue(url as never);
 
     const cleanup = initialiseNotifications();
 
@@ -82,12 +102,14 @@ describe("initialiseNotifications", () => {
     expect(addReceivedListener).toHaveBeenCalledWith(handleReceived);
     expect(addResponseListener).toHaveBeenCalledTimes(1);
     expect(addTokenListener).toHaveBeenCalledTimes(1);
+    expect(addUrlListener).toHaveBeenCalledWith("url", expect.any(Function));
 
     cleanup();
 
     expect(received.remove).toHaveBeenCalledTimes(1);
     expect(response.remove).toHaveBeenCalledTimes(1);
     expect(token.remove).toHaveBeenCalledTimes(1);
+    expect(url.remove).toHaveBeenCalledTimes(1);
   });
 
   it("handles and clears a last response present at startup", () => {
@@ -139,5 +161,38 @@ describe("initialiseNotifications", () => {
     expect(addReceivedListener).toHaveBeenCalledTimes(1);
     expect(addResponseListener).toHaveBeenCalledTimes(1);
     expect(addTokenListener).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles a bubble deep link that launched the app", async () => {
+    getInitialUrl.mockResolvedValueOnce("kmcqadminmobilechatapp://livechat?conversationId=42");
+
+    initialiseNotifications();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(handleDeepLink).toHaveBeenCalledWith(
+      "kmcqadminmobilechatapp://livechat?conversationId=42",
+      false,
+    );
+  });
+
+  it("handles bubble deep links while the app is running", () => {
+    initialiseNotifications();
+    const url = "kmcqadminmobilechatapp://livechat?conversationId=42";
+
+    urlListener!({ url });
+
+    expect(handleDeepLink).toHaveBeenCalledWith(url);
+  });
+
+  it("survives an unavailable initial URL", async () => {
+    getInitialUrl.mockRejectedValueOnce(new Error("unavailable"));
+
+    expect(() => initialiseNotifications()).not.toThrow();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(addReceivedListener).toHaveBeenCalledTimes(1);
+    expect(addUrlListener).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import * as Notifications from "expo-notifications";
+import { parseLivechatMessageData } from "../lib/notifications/notificationData";
 
 export function MessageBubble() {
   const [message, setMessage] = useState<{ title: string; body: string } | null>(null);
@@ -8,11 +9,14 @@ export function MessageBubble() {
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const content = notification.request.content;
+      const livechat = parseLivechatMessageData(content.data);
       const title = typeof content.title === "string" ? content.title.slice(0, 80) : "";
       const body = typeof content.body === "string" ? content.body.slice(0, 180) : "";
+      const fallbackTitle = livechat ? "New LiveChat message" : "";
+      const fallbackBody = livechat?.senderName ?? "";
 
-      if (!title && !body) return;
-      setMessage({ title, body });
+      if (!title && !body && !fallbackTitle && !fallbackBody) return;
+      setMessage({ title: title || fallbackTitle, body: body || fallbackBody });
     });
 
     return () => subscription.remove();

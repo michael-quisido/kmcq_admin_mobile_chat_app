@@ -27,6 +27,10 @@ jest.mock("expo-notifications", () => ({
 }));
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("../alertCoordinator", () => ({ notifyNewMessage: jest.fn() }));
+jest.mock("../livechatBubbles", () => ({
+  clearAllLivechatBubbles: jest.fn(async () => undefined),
+  clearLivechatConversationBubble: jest.fn(async () => undefined),
+}));
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(async () => null),
   setItemAsync: jest.fn(async () => undefined),
@@ -41,10 +45,12 @@ import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 import api from "../../api";
 import { notifyNewMessage } from "../alertCoordinator";
+import { clearAllLivechatBubbles } from "../livechatBubbles";
 import { consumePendingConversationId } from "../pendingConversation";
 import {
   configureNotifications,
   getNotificationPermission,
+  handleLivechatDeepLink,
   handleNotificationReceived,
   handleNotificationResponse,
   registerForPushIfPermitted,
@@ -65,6 +71,7 @@ const deleteItem = jest.mocked(SecureStore.deleteItemAsync);
 const post = jest.mocked(api.post);
 const push = jest.mocked(router.push);
 const alert = jest.mocked(notifyNewMessage);
+const clearBubbles = jest.mocked(clearAllLivechatBubbles);
 const constants = Constants as unknown as { expoConfig: unknown; easConfig: unknown };
 
 beforeEach(() => {
@@ -181,6 +188,7 @@ describe("unregisterForPushNotifications", () => {
     });
     post.mockRejectedValueOnce(new Error("offline"));
     await expect(unregisterForPushNotifications("ExponentPushToken[unit]")).resolves.toBeUndefined();
+    expect(clearBubbles).toHaveBeenCalledTimes(2);
   });
 
   it("uses the stored token when none is passed", async () => {
@@ -193,6 +201,14 @@ describe("unregisterForPushNotifications", () => {
       token: "ExponentPushToken[stored]",
     });
     expect(deleteItem).toHaveBeenCalledWith("kmcq_expo_push_token");
+    expect(clearBubbles).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears local bubbles even when no token is stored", async () => {
+    await unregisterForPushNotifications();
+
+    expect(post).not.toHaveBeenCalled();
+    expect(clearBubbles).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -323,5 +339,32 @@ describe("handleNotificationReceived", () => {
       sender: "visitor",
       muted: false,
     });
+  });
+});
+
+describe("handleLivechatDeepLink", () => {
+  it("stores and routes to a conversation from a bubble link", () => {
+    handleLivechatDeepLink("kmcqadminmobilechatapp://livechat?conversationId=42");
+
+    expect(consumePendingConversationId()).toBe(42);
+    expect(push).toHaveBeenCalledWith({
+      pathname: "/livechat",
+      params: { conversationId: "42" },
+    });
+  });
+
+  it("stores without navigating during cold start", () => {
+    handleLivechatDeepLink("kmcqadminmobilechatapp://livechat?conversationId=42", false);
+
+    expect(consumePendingConversationId()).toBe(42);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("ignores unrelated URLs", () => {
+    handleLivechatDeepLink("kmcqadminmobilechatapp://settings");
+    handleLivechatDeepLink(null);
+
+    expect(consumePendingConversationId()).toBeNull();
+    expect(push).not.toHaveBeenCalled();
   });
 });

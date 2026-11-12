@@ -1,0 +1,9 @@
+expo.modules.livechatbubbles.livechat-bubbles-pngs-0 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/build/generated/res/pngs/debug
+expo.modules.livechatbubbles.livechat-bubbles-updated_navigation_xml-1 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/build/generated/updated_navigation_xml/debug
+expo.modules.livechatbubbles.livechat-bubbles-mergeDebugResources-2 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+expo.modules.livechatbubbles.livechat-bubbles-mergeDebugResources-3 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+expo.modules.livechatbubbles.livechat-bubbles-debug-4 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/build/intermediates/merged_res/debug/mergeDebugResources
+expo.modules.livechatbubbles.livechat-bubbles-debug-5 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/build/intermediates/packaged_res/debug/packageDebugResources
+expo.modules.livechatbubbles.livechat-bubbles-debug-6 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/src/debug/res
+expo.modules.livechatbubbles.livechat-bubbles-main-7 /home/mike_q/Downloads/Apps/KMCQ GmbH/kmcq_admin_mobile_chat_app/modules/livechat-bubbles/android/src/main/res
+gradleHome-0 /home/mike_q/.gradle

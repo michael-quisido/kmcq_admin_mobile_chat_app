@@ -1,0 +1,27 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.livechatbubbles'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.livechatbubbles"
+
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+def expoNotificationsVersion = new groovy.json.JsonSlurper().parseText(
+  new File(rootProject.projectDir.parentFile, 'node_modules/expo-notifications/package.json').text
+).version
+
+dependencies {
+  implementation "host.exp.exponent:expo.modules.notifications:${expoNotificationsVersion}"
+  implementation 'com.google.firebase:firebase-messaging:25.0.1'
+  implementation 'androidx.core:core:1.17.0'
+  implementation 'androidx.lifecycle:lifecycle-process:2.9.3'
+}

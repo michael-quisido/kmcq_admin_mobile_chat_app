@@ -1,10 +1,33 @@
 import { describe, expect, it } from "@jest/globals";
-import { parseLivechatMessageData, parseTestNotificationData } from "../notificationData";
+import {
+  parseLivechatDeepLink,
+  parseLivechatMessageData,
+  parseTestNotificationData,
+} from "../notificationData";
 
 describe("parseLivechatMessageData", () => {
   it("accepts valid positive integer IDs", () => {
     expect(
       parseLivechatMessageData({ type: "livechat_message", conversationId: 42, messageId: 1001 }),
+    ).toEqual({ conversationId: 42, messageId: 1001 });
+  });
+
+  it("keeps a non-empty sender name for data-only notifications", () => {
+    expect(
+      parseLivechatMessageData({
+        type: "livechat_message",
+        conversationId: 42,
+        messageId: 1001,
+        senderName: "Anna Weber",
+      }),
+    ).toEqual({ conversationId: 42, messageId: 1001, senderName: "Anna Weber" });
+    expect(
+      parseLivechatMessageData({
+        type: "livechat_message",
+        conversationId: 42,
+        messageId: 1001,
+        senderName: "   ",
+      }),
     ).toEqual({ conversationId: 42, messageId: 1001 });
   });
 
@@ -49,5 +72,22 @@ describe("parseTestNotificationData", () => {
 
   it("rejects array payloads", () => {
     expect(parseTestNotificationData([])).toBe(false);
+  });
+});
+
+describe("parseLivechatDeepLink", () => {
+  it("returns the conversation ID from the livechat deep link", () => {
+    expect(
+      parseLivechatDeepLink("kmcqadminmobilechatapp://livechat?conversationId=42"),
+    ).toBe(42);
+  });
+
+  it("rejects other schemes, hosts, and invalid IDs", () => {
+    expect(parseLivechatDeepLink("https://livechat?conversationId=42")).toBeNull();
+    expect(parseLivechatDeepLink("kmcqadminmobilechatapp://settings?conversationId=42")).toBeNull();
+    expect(parseLivechatDeepLink("kmcqadminmobilechatapp://livechat?conversationId=0")).toBeNull();
+    expect(parseLivechatDeepLink("kmcqadminmobilechatapp://livechat?conversationId=abc")).toBeNull();
+    expect(parseLivechatDeepLink("kmcqadminmobilechatapp://livechat")).toBeNull();
+    expect(parseLivechatDeepLink(null)).toBeNull();
   });
 });
