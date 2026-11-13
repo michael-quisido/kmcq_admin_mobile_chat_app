@@ -8,6 +8,7 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 import {
   clearAllLivechatBubbles,
   clearLivechatConversationBubble,
+  ensureLivechatNotificationChannel,
 } from "../livechatBubbles";
 
 const requireModule = jest.mocked(requireOptionalNativeModule);
@@ -18,6 +19,16 @@ beforeEach(() => {
 });
 
 describe("livechat bubble cleanup", () => {
+  it("creates or repairs the notification channel through the native module", async () => {
+    const ensureChannels = jest.fn(async () => undefined);
+    requireModule.mockReturnValue({ ensureChannels, clearConversation: jest.fn(), clearAll: jest.fn() } as never);
+
+    await ensureLivechatNotificationChannel();
+
+    expect(requireModule).toHaveBeenCalledWith("LivechatBubbles");
+    expect(ensureChannels).toHaveBeenCalledTimes(1);
+  });
+
   it("clears one conversation through the native module", async () => {
     const clearConversation = jest.fn(async (_conversationId: number) => undefined);
     requireModule.mockReturnValue({ clearConversation, clearAll: jest.fn() } as never);
@@ -48,6 +59,7 @@ describe("livechat bubble cleanup", () => {
   });
 
   it("is a no-op when the native module is unavailable", async () => {
+    await expect(ensureLivechatNotificationChannel()).resolves.toBeUndefined();
     await expect(clearLivechatConversationBubble(42)).resolves.toBeUndefined();
     await expect(clearAllLivechatBubbles()).resolves.toBeUndefined();
   });

@@ -2,7 +2,7 @@ import axios from "axios";
 
 const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 
-const API_BASE_URL = (configuredApiUrl || "https://kmcq-gmbh.com/").replace(/\/+$/, "");
+const API_BASE_URL = (configuredApiUrl || "http://192.168.5.89:3000/").replace(/\/+$/, "");
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

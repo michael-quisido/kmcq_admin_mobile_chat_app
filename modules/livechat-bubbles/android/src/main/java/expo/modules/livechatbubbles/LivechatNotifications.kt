@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -18,6 +19,7 @@ import androidx.core.graphics.drawable.IconCompat
 object LivechatNotifications {
   private const val PREFS_NAME = "livechat_bubbles"
   private const val KEY_CONVERSATION_IDS = "conversation_ids"
+  private const val KEY_BUBBLES_CONFIGURED = "bubbles_configured"
   private const val CHANNEL_ID = "livechat"
   private const val SILENT_CHANNEL_ID = "livechat_silent"
   private const val TAG_PREFIX = "livechat_conversation_"
@@ -108,7 +110,7 @@ object LivechatNotifications {
       .build()
 
     return NotificationCompat.MessagingStyle(agent)
-      .setConversationTitle(senderName)
+      .setGroupConversation(false)
       .addMessage(MESSAGE_TEXT, System.currentTimeMillis(), visitor)
   }
 
@@ -165,24 +167,33 @@ object LivechatNotifications {
     }
   }
 
-  private fun ensureChannels(context: Context) {
+  fun ensureChannels(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
+    val prefs = conversationPrefs(context)
 
     val livechat = manager.getNotificationChannel(CHANNEL_ID)
-    if (livechat == null) {
+    if (livechat == null || !prefs.getBoolean(KEY_BUBBLES_CONFIGURED, false)) {
+      if (livechat != null) {
+        manager.deleteNotificationChannel(CHANNEL_ID)
+      }
       manager.createNotificationChannel(
         NotificationChannel(CHANNEL_ID, "LiveChat messages", NotificationManager.IMPORTANCE_HIGH).apply {
           description = "New visitor messages"
+          setSound(
+            Uri.parse("android.resource://${context.packageName}/raw/kmcq_gmbh_doorbell"),
+            AudioAttributes.Builder()
+              .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+              .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+              .build()
+          )
           enableVibration(true)
           setShowBadge(true)
           setAllowBubbles(true)
         }
       )
-    } else if (!livechat.canBubble()) {
-      livechat.setAllowBubbles(true)
-      manager.createNotificationChannel(livechat)
+      prefs.edit().putBoolean(KEY_BUBBLES_CONFIGURED, true).apply()
     }
 
     if (manager.getNotificationChannel(SILENT_CHANNEL_ID) == null) {

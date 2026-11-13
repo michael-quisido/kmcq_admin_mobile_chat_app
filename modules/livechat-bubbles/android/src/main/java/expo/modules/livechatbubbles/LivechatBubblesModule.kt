@@ -7,6 +7,12 @@ class LivechatBubblesModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("LivechatBubbles")
 
+    AsyncFunction("ensureChannels") {
+      val context = appContext.reactContext ?: return@AsyncFunction null
+      LivechatNotifications.ensureChannels(context)
+      null
+    }
+
     AsyncFunction("clearConversation") { conversationId: Int ->
       val context = appContext.reactContext ?: return@AsyncFunction null
       LivechatNotifications.clearConversation(context, conversationId)

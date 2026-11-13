@@ -30,6 +30,7 @@ jest.mock("../alertCoordinator", () => ({ notifyNewMessage: jest.fn() }));
 jest.mock("../livechatBubbles", () => ({
   clearAllLivechatBubbles: jest.fn(async () => undefined),
   clearLivechatConversationBubble: jest.fn(async () => undefined),
+  ensureLivechatNotificationChannel: jest.fn(async () => undefined),
 }));
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(async () => null),
@@ -45,7 +46,10 @@ import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 import api from "../../api";
 import { notifyNewMessage } from "../alertCoordinator";
-import { clearAllLivechatBubbles } from "../livechatBubbles";
+import {
+  clearAllLivechatBubbles,
+  ensureLivechatNotificationChannel,
+} from "../livechatBubbles";
 import { consumePendingConversationId } from "../pendingConversation";
 import {
   configureNotifications,
@@ -72,6 +76,7 @@ const post = jest.mocked(api.post);
 const push = jest.mocked(router.push);
 const alert = jest.mocked(notifyNewMessage);
 const clearBubbles = jest.mocked(clearAllLivechatBubbles);
+const ensureChannel = jest.mocked(ensureLivechatNotificationChannel);
 const constants = Constants as unknown as { expoConfig: unknown; easConfig: unknown };
 
 beforeEach(() => {
@@ -259,6 +264,7 @@ describe("configureNotifications", () => {
       platform.restore();
     }
 
+    expect(ensureChannel).toHaveBeenCalledTimes(1);
     expect(setChannel).toHaveBeenCalledWith(
       "livechat",
       expect.objectContaining({

@@ -1,6 +1,7 @@
 import { requireOptionalNativeModule } from "expo-modules-core";
 
 type LivechatBubblesNativeModule = {
+  ensureChannels(): Promise<void>;
   clearConversation(conversationId: number): Promise<void>;
   clearAll(): Promise<void>;
 };
@@ -10,6 +11,14 @@ function nativeModule(): LivechatBubblesNativeModule | null {
     return requireOptionalNativeModule<LivechatBubblesNativeModule>("LivechatBubbles");
   } catch {
     return null;
+  }
+}
+
+export async function ensureLivechatNotificationChannel(): Promise<void> {
+  try {
+    await nativeModule()?.ensureChannels();
+  } catch {
+    // Falls back to the channel created by expo-notifications.
   }
 }
 

@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.kmcq.adminmobilechatapp",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

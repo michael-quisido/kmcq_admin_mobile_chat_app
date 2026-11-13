@@ -7,7 +7,10 @@ import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 import api from "../api";
 import { notifyNewMessage } from "./alertCoordinator";
-import { clearAllLivechatBubbles } from "./livechatBubbles";
+import {
+  clearAllLivechatBubbles,
+  ensureLivechatNotificationChannel,
+} from "./livechatBubbles";
 import {
   parseLivechatDeepLink,
   parseLivechatMessageData,
@@ -37,6 +40,8 @@ export async function configureNotifications(): Promise<void> {
   });
 
   if (Platform.OS !== "android") return;
+
+  await ensureLivechatNotificationChannel();
 
   try {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
