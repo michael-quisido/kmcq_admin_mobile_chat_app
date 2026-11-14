@@ -59,7 +59,7 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "livechat",
+          "defaultChannel": "livechat_v2",
           "sounds": ["./assets/notification_sound/kmcq_gmbh_doorbell.wav"]
         }
       ],

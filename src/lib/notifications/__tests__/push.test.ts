@@ -19,6 +19,7 @@ jest.mock("expo-notifications", () => ({
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
+  getDevicePushTokenAsync: jest.fn(),
   setNotificationChannelAsync: jest.fn(),
   setNotificationHandler: jest.fn(),
   addNotificationReceivedListener: jest.fn(),
@@ -67,6 +68,7 @@ import {
 const getPermissions = jest.mocked(Notifications.getPermissionsAsync);
 const requestPermissions = jest.mocked(Notifications.requestPermissionsAsync);
 const getToken = jest.mocked(Notifications.getExpoPushTokenAsync);
+const getDeviceToken = jest.mocked(Notifications.getDevicePushTokenAsync);
 const setHandler = jest.mocked(Notifications.setNotificationHandler);
 const setChannel = jest.mocked(Notifications.setNotificationChannelAsync);
 const setItem = jest.mocked(SecureStore.setItemAsync);
@@ -88,6 +90,7 @@ beforeEach(() => {
   getPermissions.mockResolvedValue({ granted: true, status: "granted" } as never);
   requestPermissions.mockResolvedValue({ granted: true, status: "granted" } as never);
   getToken.mockResolvedValue({ data: "ExponentPushToken[unit]" } as never);
+  getDeviceToken.mockResolvedValue({ type: "android", data: "fcm-native-token" } as never);
   post.mockResolvedValue({ data: { ok: true } } as never);
 });
 
@@ -151,6 +154,34 @@ describe("registerForPushNotifications", () => {
       platform: "ios",
     });
     expect(setItem).toHaveBeenCalledWith("kmcq_expo_push_token", "ExponentPushToken[unit]");
+  });
+
+  it("registers the native FCM token on Android", async () => {
+    const platform = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      await expect(registerForPushNotifications()).resolves.toBe("fcm-native-token");
+    } finally {
+      platform.restore();
+    }
+
+    expect(getDeviceToken).toHaveBeenCalledTimes(1);
+    expect(getToken).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledWith("/api/mobile/livechat/push/register", {
+      token: "fcm-native-token",
+      platform: "android",
+    });
+    expect(setItem).toHaveBeenCalledWith("kmcq_expo_push_token", "fcm-native-token");
+  });
+
+  it("registers Android without requiring an EAS project ID", async () => {
+    constants.expoConfig = { extra: {} };
+    constants.easConfig = null;
+    const platform = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      await expect(registerForPushNotifications()).resolves.toBe("fcm-native-token");
+    } finally {
+      platform.restore();
+    }
   });
 
   it("returns null if server registration fails", async () => {
@@ -256,7 +287,7 @@ describe("configureNotifications", () => {
     });
   });
 
-  it("configures the Android livechat channel with the doorbell sound", async () => {
+  it("leaves Android livechat channel ownership to the native module", async () => {
     const platform = jest.replaceProperty(Platform, "OS", "android");
     try {
       await configureNotifications();
@@ -265,13 +296,7 @@ describe("configureNotifications", () => {
     }
 
     expect(ensureChannel).toHaveBeenCalledTimes(1);
-    expect(setChannel).toHaveBeenCalledWith(
-      "livechat",
-      expect.objectContaining({
-        sound: "kmcq_gmbh_doorbell.wav",
-        importance: 6,
-      }),
-    );
+    expect(setChannel).not.toHaveBeenCalled();
     expect(Platform.OS).toBe("ios");
   });
 });

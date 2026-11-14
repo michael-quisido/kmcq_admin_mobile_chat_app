@@ -19,8 +19,8 @@ import androidx.core.graphics.drawable.IconCompat
 object LivechatNotifications {
   private const val PREFS_NAME = "livechat_bubbles"
   private const val KEY_CONVERSATION_IDS = "conversation_ids"
-  private const val KEY_BUBBLES_CONFIGURED = "bubbles_configured"
-  private const val CHANNEL_ID = "livechat"
+  private const val CHANNEL_ID = "livechat_v2"
+  private const val LEGACY_CHANNEL_ID = "livechat"
   private const val SILENT_CHANNEL_ID = "livechat_silent"
   private const val TAG_PREFIX = "livechat_conversation_"
   private const val SHORTCUT_ID_PREFIX = "livechat_"
@@ -28,9 +28,11 @@ object LivechatNotifications {
   private const val DEFAULT_SENDER = "LiveChat"
   private const val MESSAGE_TEXT = "New LiveChat message"
   private const val DEEP_LINK_SCHEME = "kmcqadminmobilechatapp"
+  private const val SYSTEM_NOTIFICATION_FLAG = "1"
 
   fun handleMessage(context: Context, data: Map<String, String>, foreground: Boolean) {
     if (data["type"] != "livechat_message") return
+    if (data["systemNotification"] == SYSTEM_NOTIFICATION_FLAG) return
 
     val conversationId = data["conversationId"]?.toIntOrNull()?.takeIf { it > 0 } ?: return
     val senderName = data["senderName"]?.trim().takeUnless { it.isNullOrEmpty() } ?: DEFAULT_SENDER
@@ -171,13 +173,8 @@ object LivechatNotifications {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
-    val prefs = conversationPrefs(context)
 
-    val livechat = manager.getNotificationChannel(CHANNEL_ID)
-    if (livechat == null || !prefs.getBoolean(KEY_BUBBLES_CONFIGURED, false)) {
-      if (livechat != null) {
-        manager.deleteNotificationChannel(CHANNEL_ID)
-      }
+    if (manager.getNotificationChannel(CHANNEL_ID) == null) {
       manager.createNotificationChannel(
         NotificationChannel(CHANNEL_ID, "LiveChat messages", NotificationManager.IMPORTANCE_HIGH).apply {
           description = "New visitor messages"
@@ -193,7 +190,10 @@ object LivechatNotifications {
           setAllowBubbles(true)
         }
       )
-      prefs.edit().putBoolean(KEY_BUBBLES_CONFIGURED, true).apply()
+    }
+
+    if (manager.getNotificationChannel(LEGACY_CHANNEL_ID) != null) {
+      manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
     }
 
     if (manager.getNotificationChannel(SILENT_CHANNEL_ID) == null) {

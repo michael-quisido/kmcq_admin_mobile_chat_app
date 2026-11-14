@@ -2,7 +2,6 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { AndroidImportance } from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 import api from "../api";
@@ -20,7 +19,6 @@ import { setPendingConversationId } from "./pendingConversation";
 import type { NotificationPermission, PushTestResult } from "./push.types";
 
 const PUSH_TOKEN_KEY = "kmcq_expo_push_token";
-const CHANNEL_ID = "livechat";
 
 function getProjectId(): string | null {
   return Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? null;
@@ -42,19 +40,6 @@ export async function configureNotifications(): Promise<void> {
   if (Platform.OS !== "android") return;
 
   await ensureLivechatNotificationChannel();
-
-  try {
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: "LiveChat messages",
-      importance: AndroidImportance.HIGH,
-      sound: "kmcq_gmbh_doorbell.wav",
-      vibrationPattern: [0, 250, 250, 250],
-      enableVibrate: true,
-      lightColor: "#27a343",
-    });
-  } catch {
-    // The channel may already exist; it still uses the configured sound.
-  }
 }
 
 export async function getNotificationPermission(): Promise<NotificationPermission> {
@@ -85,22 +70,28 @@ async function registerDeviceToken(): Promise<string | null> {
   try {
     if (!Device.isDevice) return null;
 
-    const projectId = getProjectId();
-    if (!projectId) return null;
-
-    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    let token: string;
+    if (Platform.OS === "android") {
+      const deviceToken = await Notifications.getDevicePushTokenAsync();
+      token = deviceToken.data;
+    } else {
+      const projectId = getProjectId();
+      if (!projectId) return null;
+      const expoToken = await Notifications.getExpoPushTokenAsync({ projectId });
+      token = expoToken.data;
+    }
 
     try {
       await api.post("/api/mobile/livechat/push/register", {
-        token: token.data,
+        token,
         platform: Platform.OS === "android" ? "android" : "ios",
       });
-      await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token.data);
+      await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
     } catch {
       return null;
     }
 
-    return token.data;
+    return token;
   } catch {
     return null;
   }
