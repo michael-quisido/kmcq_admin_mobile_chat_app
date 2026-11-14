@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "225267482738",
+    "project_id": "kmcq-admin-chat-app-89924",
+    "storage_bucket": "kmcq-admin-chat-app-89924.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:225267482738:android:473fdb049626644214c2eb",
+        "android_client_info": {
+          "package_name": "com.kmcq.adminmobilechatapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuFSkRSBKyhum1BPdfzsv5ohE8oVSWJf8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
