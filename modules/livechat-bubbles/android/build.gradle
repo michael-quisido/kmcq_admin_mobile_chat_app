@@ -7,7 +7,7 @@ group = 'expo.modules.livechatbubbles'
 version = '0.1.0'
 
 android {
-  namespace "expo.modules.livechatbubbles"
+  namespace = "expo.modules.livechatbubbles"
 
   defaultConfig {
     versionCode 1

@@ -1,0 +1,25 @@
+diff --git a/node_modules/react-native-webview/android/build.gradle b/node_modules/react-native-webview/android/build.gradle
+index ae14145..5c964ae 100644
+--- a/node_modules/react-native-webview/android/build.gradle
++++ b/node_modules/react-native-webview/android/build.gradle
+@@ -61,9 +61,9 @@ apply plugin: 'kotlin-android'
+ 
+ android {
+     if (supportsNamespace()) {
+-        namespace "com.reactnativecommunity.webview"
++        namespace = "com.reactnativecommunity.webview"
+         buildFeatures {
+-            buildConfig true
++            buildConfig = true
+         }
+ 
+         sourceSets {
+@@ -101,7 +101,7 @@ if (codegenPath == null) {
+ 
+ repositories {
+     maven {
+-        url "${reactNativePath}/android"
++        url = "${reactNativePath}/android"
+     }
+     mavenCentral()
+     google()
