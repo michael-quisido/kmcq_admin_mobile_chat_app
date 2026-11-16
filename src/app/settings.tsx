@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
@@ -88,72 +99,74 @@ export default function SettingsScreen() {
         <View style={styles.headerButton} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.section}>
-          <Text style={styles.label}>Admin alert email</Text>
-          <TextInput
-            style={styles.input}
-            value={adminEmail}
-            onChangeText={setAdminEmail}
-            placeholder="Email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <Text style={styles.hint}>New visitor messages are emailed here. Phase 2 replies happen in this console.</Text>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+          <View style={styles.section}>
+            <Text style={styles.label}>Admin alert email</Text>
+            <TextInput
+              style={styles.input}
+              value={adminEmail}
+              onChangeText={setAdminEmail}
+              placeholder="Email"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Text style={styles.hint}>New visitor messages are emailed here. Phase 2 replies happen in this console.</Text>
 
-          <Text style={styles.label}>Retention days</Text>
-          <TextInput
-            style={styles.input}
-            value={retentionDays}
-            onChangeText={setRetentionDays}
-            placeholder="30"
-            keyboardType="number-pad"
-          />
-          <Text style={styles.hint}>Between 1 and 3650. Conversations are kept for this long; nothing is deleted automatically.</Text>
+            <Text style={styles.label}>Retention days</Text>
+            <TextInput
+              style={styles.input}
+              value={retentionDays}
+              onChangeText={setRetentionDays}
+              placeholder="30"
+              keyboardType="number-pad"
+            />
+            <Text style={styles.hint}>Between 1 and 3650. Conversations are kept for this long; nothing is deleted automatically.</Text>
 
-          <Text style={styles.label}>Stale after (minutes)</Text>
-          <TextInput
-            style={styles.input}
-            value={staleMinutes}
-            onChangeText={setStaleMinutes}
-            placeholder="10"
-            keyboardType="number-pad"
-          />
-          <Text style={styles.hint}>Between 1 and 1440. A conversation quiet for this long is flagged in the inbox and shown to the visitor as still there.</Text>
+            <Text style={styles.label}>Stale after (minutes)</Text>
+            <TextInput
+              style={styles.input}
+              value={staleMinutes}
+              onChangeText={setStaleMinutes}
+              placeholder="10"
+              keyboardType="number-pad"
+            />
+            <Text style={styles.hint}>Between 1 and 1440. A conversation quiet for this long is flagged in the inbox and shown to the visitor as still there.</Text>
 
-          <Text style={styles.label}>Telegram chat ID</Text>
-          <TextInput
-            style={styles.input}
-            value={telegramChatId}
-            onChangeText={setTelegramChatId}
-            placeholder="Chat ID"
-            keyboardType="numbers-and-punctuation"
-          />
-          <Text style={styles.hint}>Unanswered chats are also pushed here. Create a bot with @BotFather, send it a message, then read the chat ID from getUpdates. Leave blank to turn this off.</Text>
-          {!telegramConfigured && <Text style={styles.hint}>Notifications are not active: the LIVE_CHAT_TELEGRAM_BOT_TOKEN environment variable is not set on the server.</Text>}
+            <Text style={styles.label}>Telegram chat ID</Text>
+            <TextInput
+              style={styles.input}
+              value={telegramChatId}
+              onChangeText={setTelegramChatId}
+              placeholder="Chat ID"
+              keyboardType="numbers-and-punctuation"
+            />
+            <Text style={styles.hint}>Unanswered chats are also pushed here. Create a bot with @BotFather, send it a message, then read the chat ID from getUpdates. Leave blank to turn this off.</Text>
+            {!telegramConfigured && <Text style={styles.hint}>Notifications are not active: the LIVE_CHAT_TELEGRAM_BOT_TOKEN environment variable is not set on the server.</Text>}
 
-          <TouchableOpacity
-            style={[styles.testButton, !canTest && styles.buttonDisabled]}
-            onPress={sendTestMessage}
-            disabled={!canTest}
-          >
-            <Text style={styles.testButtonText}>{testing ? "Sending..." : "Send test message"}</Text>
-          </TouchableOpacity>
-          {chatIdUnsaved && <Text style={styles.hint}>Testing uses the chat ID the server has saved. Save your change first.</Text>}
-          {!chatIdUnsaved && savedTelegramChatId === "" && <Text style={styles.hint}>Set a chat ID and save it before testing.</Text>}
-          {!chatIdUnsaved && savedTelegramChatId !== "" && !telegramConfigured && (
-            <Text style={styles.hint}>Set LIVE_CHAT_TELEGRAM_BOT_TOKEN on the server, then restart the app, before testing.</Text>
-          )}
+            <TouchableOpacity
+              style={[styles.testButton, !canTest && styles.buttonDisabled]}
+              onPress={sendTestMessage}
+              disabled={!canTest}
+            >
+              <Text style={styles.testButtonText}>{testing ? "Sending..." : "Send test message"}</Text>
+            </TouchableOpacity>
+            {chatIdUnsaved && <Text style={styles.hint}>Testing uses the chat ID the server has saved. Save your change first.</Text>}
+            {!chatIdUnsaved && savedTelegramChatId === "" && <Text style={styles.hint}>Set a chat ID and save it before testing.</Text>}
+            {!chatIdUnsaved && savedTelegramChatId !== "" && !telegramConfigured && (
+              <Text style={styles.hint}>Set LIVE_CHAT_TELEGRAM_BOT_TOKEN on the server, then restart the app, before testing.</Text>
+            )}
 
-          <TouchableOpacity style={styles.saveButton} onPress={save} disabled={saving}>
-            <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save"}</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.saveButton} onPress={save} disabled={saving}>
+              <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save"}</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#1f2937", marginTop: 10 }]} onPress={() => router.push("/notification-sound")}>
-            <Text style={styles.saveButtonText}>Notification sound</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+            <TouchableOpacity style={[styles.saveButton, { backgroundColor: "#1f2937", marginTop: 10 }]} onPress={() => router.push("/notification-sound")}>
+              <Text style={styles.saveButtonText}>Notification sound</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -163,6 +176,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
+  flex: { flex: 1 },
   center: {
     flex: 1,
     justifyContent: "center",
@@ -194,6 +208,7 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 10,
+    paddingBottom: 24,
   },
   section: {
     backgroundColor: "white",

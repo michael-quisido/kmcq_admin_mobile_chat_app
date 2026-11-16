@@ -83,15 +83,19 @@ object LivechatNotifications {
       .setContentText(MESSAGE_TEXT)
       .setStyle(messagingStyle(senderName))
       .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-      .setPriority(if (foreground) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
+      .setPriority(if (foreground) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_MAX)
       .setContentIntent(contentIntent(context, conversationId))
       .setAutoCancel(true)
-      .setOnlyAlertOnce(foreground)
+      .setOnlyAlertOnce(false)
       .setSilent(foreground)
       .setShowWhen(true)
       .setWhen(System.currentTimeMillis())
       .setColor(Color.rgb(39, 163, 67))
       .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+    if (!foreground) {
+      builder.setDefaults(NotificationCompat.DEFAULT_ALL)
+    }
 
     if (!foreground) {
       builder
@@ -174,7 +178,11 @@ object LivechatNotifications {
 
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
 
-    if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+    val livechatChannel = manager.getNotificationChannel(CHANNEL_ID)
+    if (livechatChannel == null || livechatChannel.importance != NotificationManager.IMPORTANCE_HIGH) {
+      if (livechatChannel != null) {
+        manager.deleteNotificationChannel(CHANNEL_ID)
+      }
       manager.createNotificationChannel(
         NotificationChannel(CHANNEL_ID, "LiveChat messages", NotificationManager.IMPORTANCE_HIGH).apply {
           description = "New visitor messages"

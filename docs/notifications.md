@@ -29,7 +29,7 @@ The local `livechat-bubbles` Expo module subclasses `ExpoFirebaseMessagingServic
 
 The native service is registered by the module manifest. The `withLivechatBubbles` config plugin removes Expo's lower-priority FCM service declaration and marks `MainActivity` resizeable so bubbles can open as an activity. The app still calls Expo's listener for foreground JS events; Expo suppresses its own foreground banner.
 
-The native module owns the Android `livechat_v2` channel. Expo's `setNotificationChannelAsync` is not used for this channel because it resets the native importance, sound, vibration, and bubble fields on app startup. The native module creates the channel with `IMPORTANCE_HIGH`, the bundled doorbell sound, vibration, badges, and bubbles enabled. Heads-up presentation is controlled by channel importance and notification priority; the system notification supplies `channelId: livechat_v2` and `priority: high`. The new channel ID is a deliberate one-time reset: Android does not allow apps to change immutable channel fields such as the bubble flag after creation, so older installs would otherwise keep a channel created by Expo. The legacy `livechat` channel is deleted after the new channel is created; after that the channel is left alone so users can change its settings in Android.
+The native module owns the Android `livechat_v2` channel. Expo's `setNotificationChannelAsync` is not used for this channel because it resets native channel settings. The native module creates the channel with `IMPORTANCE_HIGH`, the bundled doorbell sound, vibration, badges, and bubbles enabled, and it repairs the channel if Android reports importance lower than `HIGH` (for example after user changes in system settings). Heads-up/bubble presentation depends on both channel importance and notification priority; the system notification supplies `channelId: livechat_v2` and `priority: high`. The new channel ID was introduced to reset bad defaults; Android still does not allow apps to change some immutable fields later (for example sound), so if those are wrong you may need to clear app data or reinstall. The legacy `livechat` channel is deleted after the new channel is created.
 
 ## Muting
 
@@ -42,7 +42,7 @@ The foreground sound uses the custom file selected on the Notification Sound scr
 falls back to the bundled `kmcq_gmbh_doorbell.mp3`. The separate "In-app sounds" switch
 controls foreground playback only.
 
-Android notification channel sound is fixed when the channel is created. If a user changes the channel sound in Android system settings, recreating the channel requires uninstalling/reinstalling the app or clearing app data.
+Android notification channel sound is fixed when the channel is created (system limitation). If a user lowers importance or blocks alerts in system settings, the app will try to recreate the `livechat_v2` channel with `IMPORTANCE_HIGH` on next startup/token registration/channel ensure; if they changed immutable fields like sound, those may require clearing app data or reinstalling.
 
 iOS background push sounds must be bundled files (`wav`, `caf`, or `aiff`). A user-picked
 sound applies to foreground playback only; changing a remote push sound would require a

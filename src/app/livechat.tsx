@@ -1,12 +1,29 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal, AppState } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+  AppState,
+} from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import api from "../lib/api";
 import { Conversation, fetchConversations } from "../lib/livechat/conversations";
 import { notifyNewMessage, seedConversation } from "../lib/notifications/alertCoordinator";
 import { consumePendingConversationId, clearPendingConversationId } from "../lib/notifications/pendingConversation";
-import { registerForPushIfPermitted, unregisterForPushNotifications } from "../lib/notifications/push";
+import {
+  registerForPushIfPermitted,
+  setPushAuthEnabled,
+  unregisterForPushNotifications,
+} from "../lib/notifications/push";
 import { clearLivechatConversationBubble } from "../lib/notifications/livechatBubbles";
 
 interface Message {
@@ -72,9 +89,20 @@ export default function LiveChatScreen() {
   };
 
   useEffect(() => {
-    checkAuth();
-    loadConversations();
-    loadAgents();
+    let cancelled = false;
+    const init = async () => {
+      setLoading(true);
+      try {
+        await checkAuth();
+        await Promise.allSettled([loadConversations(), loadAgents()]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void init();
+    const loadingGuard = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 12000);
     const interval = setInterval(() => {
       loadConversations();
       loadAgents();
@@ -84,15 +112,18 @@ export default function LiveChatScreen() {
         firstConversationLoadRef.current = true;
         firstMessageLoadRef.current = true;
         pushRegistrationAttemptedRef.current = false;
-        checkAuth().catch(() => {});
-        loadConversations().catch(() => {});
-        loadAgents().catch(() => {});
-        if (selectedConversationRef.current) {
-          loadMessages(selectedConversationRef.current).catch(() => {});
-        }
+        void (async () => {
+          await checkAuth().catch(() => {});
+          await Promise.allSettled([loadConversations(), loadAgents()]);
+          if (selectedConversationRef.current) {
+            await loadMessages(selectedConversationRef.current).catch(() => {});
+          }
+        })();
       }
     });
     return () => {
+      cancelled = true;
+      clearTimeout(loadingGuard);
       clearInterval(interval);
       appStateSub.remove();
       if (retryTimeoutsRef.current.conversations) clearTimeout(retryTimeoutsRef.current.conversations);
@@ -122,6 +153,7 @@ export default function LiveChatScreen() {
     try {
       await api.get("/api/mobile/livechat/auth/me");
       setAuthOk(true);
+      setPushAuthEnabled(true);
       if (!pushRegistrationAttemptedRef.current) {
         pushRegistrationAttemptedRef.current = true;
         void registerForPushIfPermitted();
@@ -129,6 +161,7 @@ export default function LiveChatScreen() {
       return true;
     } catch (error: any) {
       setAuthOk(false);
+      setPushAuthEnabled(false);
       const status = error?.response?.status;
       if (status === 401 || status === 403) {
         router.replace("/login");
@@ -171,54 +204,37 @@ export default function LiveChatScreen() {
       }
       if (result.status === "error") {
         setConversationsError(true);
-        scheduleRetry("conversations", loadConversations);
         return;
       }
-
-      const list = result.conversations;
-      const first = firstConversationLoadRef.current;
-      firstConversationLoadRef.current = false;
-
-      for (const conversation of list) {
-        if (!conversation.lastMessageId) continue;
-        if (first) {
-          seedConversation(conversation.id, conversation.lastMessageId);
-        } else {
-          notifyNewMessage({
-            conversationId: conversation.id,
-            messageId: conversation.lastMessageId,
-            sender: conversation.lastMessageSender,
-            muted: conversation.muted,
-          });
-        }
-      }
-
-      conversationsRef.current = list;
-      setConversations(list);
       setConversationsError(false);
       if (retryTimeoutsRef.current.conversations) {
         clearTimeout(retryTimeoutsRef.current.conversations);
         retryTimeoutsRef.current.conversations = undefined;
       }
-    } catch {
+      const convs = result.conversations;
+      if (firstConversationLoadRef.current) {
+        firstConversationLoadRef.current = false;
+        for (const conv of convs) {
+          const newest = conv.lastMessageId ?? 0;
+          seedConversation(conv.id, newest);
+        }
+      }
+      for (const conv of convs) {
+        if (conv.lastMessageId != null) {
+          notifyNewMessage({
+            conversationId: conv.id,
+            messageId: conv.lastMessageId,
+            sender: conv.lastMessageSender,
+            muted: conv.muted,
+          });
+        }
+      }
+      setConversations(convs);
+    } catch (error) {
       setConversationsError(true);
-      scheduleRetry("conversations", loadConversations);
     } finally {
-      setLoading(false);
       inFlightRef.current.conversations = false;
     }
-  };
-
-  const retryConversations = () => {
-    if (retryTimeoutsRef.current.conversations) {
-      clearTimeout(retryTimeoutsRef.current.conversations);
-      retryTimeoutsRef.current.conversations = undefined;
-    }
-    setConversationsError(false);
-    if (conversationsRef.current.length === 0) {
-      setLoading(true);
-    }
-    loadConversations();
   };
 
   const loadMessages = async (conversationId: number) => {
@@ -226,137 +242,48 @@ export default function LiveChatScreen() {
     inFlightRef.current.messages = true;
     try {
       const res = await api.get(`/api/mobile/livechat/conversations/${conversationId}`);
-      const newMessages: Message[] = Array.isArray(res.data?.messages) ? res.data.messages : [];
-      const latest = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
-      const latestId = latest?.id ?? 0;
-
-      if (firstMessageLoadRef.current) {
-        if (latestId > 0) seedConversation(conversationId, latestId);
-        firstMessageLoadRef.current = false;
-      } else if (latest && lastMessageIdRef.current > 0 && latestId > lastMessageIdRef.current) {
-        notifyNewMessage({
-          conversationId,
-          messageId: latestId,
-          sender: latest.sender,
-          muted: conversationsRef.current.find((c) => c.id === conversationId)?.muted,
+      const data = res.data as any;
+      setMessages(Array.isArray(data.messages) ? data.messages : []);
+      if (data.status && data.status !== "open") {
+        setConversations((prev) => {
+          const exists = prev.find((c) => c.id === conversationId);
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                id: conversationId,
+                visitorName: data.visitorName ?? "Unknown User",
+                visitorEmail: data.visitorEmail ?? "",
+                status: data.status,
+                lastMessageSender: null,
+                lastMessageId: null,
+                lastMessagePreview: null,
+                unreadCount: 0,
+                muted: false,
+              },
+            ];
+          }
+          return prev.map((c) => (c.id === conversationId ? { ...c, ...data } : c));
         });
       }
-
-      lastMessageIdRef.current = latestId;
-      setMessages((prev) => {
-        if (prev.length === newMessages.length) {
-          const same = prev.every((m, i) => m.id === newMessages[i]?.id && m.body === newMessages[i]?.body);
-          if (same) return prev;
-        }
-        return newMessages;
-      });
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 50);
-    } catch (error: any) {
-      const status = error?.response?.status;
-      if (status === 401 || status === 403) {
-        router.replace("/login");
-        return;
+      const conversation = data as Conversation;
+      if (firstMessageLoadRef.current) {
+        firstMessageLoadRef.current = false;
+        lastMessageIdRef.current = conversation.lastMessageId ?? 0;
+      } else if (data.lastMessageId != null && data.lastMessageId > lastMessageIdRef.current) {
+        notifyNewMessage({
+          conversationId,
+          messageId: data.lastMessageId,
+          sender: data.lastMessageSender,
+          muted: data.muted,
+        });
+        lastMessageIdRef.current = data.lastMessageId;
       }
-      if (status === 404) {
-        setSelectedConversation(null);
-        loadConversations();
-        return;
-      }
+      setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, ...data } : c)));
+    } catch (error) {
+      // Ignore errors
     } finally {
       inFlightRef.current.messages = false;
-    }
-  };
-
-  const handleSelectConversation = async (conversationId: number) => {
-    try {
-      await loadAgents();
-    } catch {}
-    if (agents.length === 0) {
-      Alert.alert("No agents", "Create an agent first");
-      return;
-    }
-    Alert.alert(
-      "Select Agent",
-      "Choose which agent will respond",
-      [
-        ...agents.map((agent: any) => ({
-          text: `${agent.name} (${agent.status})`,
-          onPress: async () => {
-            try {
-              await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
-                assignedAgentId: agent.id,
-              });
-              setSelectedConversation(conversationId);
-              lastMessageIdRef.current = 0;
-              loadMessages(conversationId);
-            } catch (error: any) {
-              Alert.alert("Error", error.response?.data?.error || "Failed to assign agent");
-            }
-          },
-        })),
-        { text: "Cancel", style: "cancel" },
-      ]
-    );
-  };
-
-  const closeConversation = async () => {
-    if (!selectedConversation) return;
-    Alert.alert("Close Conversation", "Are you sure you want to close this conversation?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Close",
-        style: "destructive",
-        onPress: async () => {
-          const conversationId = selectedConversation;
-          try {
-            await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
-              status: "closed",
-            });
-            await clearLivechatConversationBubble(conversationId);
-            setSelectedConversation(null);
-            loadConversations();
-            Alert.alert("Success", "Conversation closed");
-          } catch (error: any) {
-            Alert.alert("Error", error.response?.data?.error || "Failed to close conversation");
-          }
-        },
-      },
-    ]);
-  };
-
-  const reopenConversation = async (conversationId: number) => {
-    try {
-      await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
-        status: "open",
-      });
-      loadConversations();
-      Alert.alert("Success", "Conversation reopened");
-    } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Failed to reopen conversation");
-    }
-  };
-
-  const toggleMute = async () => {
-    if (!selectedConversation) return;
-    const current = conversationsRef.current.find((c) => c.id === selectedConversation);
-    const nextMuted = !current?.muted;
-    try {
-      await api.patch(`/api/mobile/livechat/conversations/${selectedConversation}`, {
-        muted: nextMuted,
-      });
-      if (nextMuted) {
-        await clearLivechatConversationBubble(selectedConversation);
-      }
-      const updated = conversationsRef.current.map((c) =>
-        c.id === selectedConversation ? { ...c, muted: nextMuted } : c,
-      );
-      conversationsRef.current = updated;
-      setConversations(updated);
-      loadConversations();
-    } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Failed to update mute");
     }
   };
 
@@ -385,6 +312,7 @@ export default function LiveChatScreen() {
   };
 
   const handleLogout = async () => {
+    setPushAuthEnabled(false);
     try {
       await unregisterForPushNotifications();
     } catch {}
@@ -394,6 +322,23 @@ export default function LiveChatScreen() {
       router.replace("/login");
     } catch (error) {
       router.replace("/login");
+    }
+  };
+
+  const handleSelectConversation = async (id: number) => {
+    setSelectedConversation(id);
+    try {
+      await clearLivechatConversationBubble(id);
+    } catch {}
+  };
+
+  const reopenConversation = async (conversationId: number) => {
+    try {
+      await api.post(`/api/mobile/livechat/conversations/${conversationId}/reopen`);
+      await loadConversations();
+      handleSelectConversation(conversationId);
+    } catch (error: any) {
+      Alert.alert("Error", error.response?.data?.error || "Failed to reopen conversation");
     }
   };
 
@@ -407,7 +352,7 @@ export default function LiveChatScreen() {
 
   if (!selectedConversation) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.headerButton}>
             <Text style={styles.menuIcon}>☰</Text>
@@ -420,106 +365,85 @@ export default function LiveChatScreen() {
         {conversationsError && conversations.length > 0 ? (
           <View style={styles.errorBanner}>
             <Text style={styles.errorBannerText}>Could not refresh conversations.</Text>
-            <TouchableOpacity onPress={retryConversations}>
+            <TouchableOpacity
+              onPress={() => {
+                setConversationsError(false);
+                loadConversations();
+              }}
+            >
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </View>
         ) : null}
-        <FlatList
-          data={conversations}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.conversationItem}
-              onPress={() => {
-                if (item.status === "closed") {
-                  Alert.alert("Closed Conversation", "Do you want to reopen this conversation?", [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Reopen",
-                      onPress: () => reopenConversation(item.id),
-                    },
-                  ]);
-                } else {
-                  handleSelectConversation(item.id);
-                }
-              }}
-              activeOpacity={0.7}
-            >
-              <View>
-                <Text style={styles.conversationName}>
-                  {(item.visitorName || item.visitorEmail || "Unknown User") + ""}
-                </Text>
-                {item.status === "closed" && <Text style={{ fontSize: 12, color: "#d33", marginTop: 2 }}>Closed</Text>}
-                {item.muted && <Text style={{ fontSize: 12, color: "#666", marginTop: 2 }}>Muted</Text>}
-                {item.lastMessagePreview ? (
-                  <Text style={styles.conversationPreview} numberOfLines={1}>
-                    {item.lastMessagePreview}
-                  </Text>
-                ) : null}
-                {item.unreadCount && item.unreadCount > 0 ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{String(item.unreadCount)}</Text>
-                  </View>
-                ) : null}
-              </View>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={
-            conversationsError ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>Could not load conversations</Text>
-                <Text style={styles.emptyDescription}>
-                  Check your connection and try again.
-                </Text>
-                <TouchableOpacity style={styles.retryButton} onPress={retryConversations}>
-                  <Text style={styles.retryButtonText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <Text style={styles.emptyText}>No conversations yet</Text>
-            )
-          }
-        />
-        <Modal
-          visible={menuVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setMenuVisible(false)}
-        >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setMenuVisible(false)}
-          >
-            <View style={styles.menuContainer}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                router.push("/account-settings");
-              }}
-            >
-              <Text style={styles.menuItemText}>Account Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                router.push("/agents");
-              }}
-            >
-              <Text style={styles.menuItemText}>Agents</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                setMenuVisible(false);
-                router.push("/settings");
-              }}
-            >
-              <Text style={styles.menuItemText}>LiveChat Settings</Text>
-            </TouchableOpacity>
+        {conversations.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={styles.emptyText}>No conversations yet</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={conversations}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.conversationItem}
+                onPress={() => {
+                  if (item.status === "closed") {
+                    Alert.alert("Closed Conversation", "Do you want to reopen this conversation?", [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Reopen", onPress: () => reopenConversation(item.id) },
+                    ]);
+                  } else {
+                    handleSelectConversation(item.id);
+                  }
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.conversationName}>{item.visitorName || "Unknown User"}</Text>
+                  {item.visitorEmail ? <Text style={styles.conversationEmail}>{item.visitorEmail}</Text> : null}
+                  {item.muted ? <Text style={styles.mutedText}>Muted</Text> : null}
+                </View>
+                <View style={styles.conversationMeta}>
+                  {(item.unreadCount ?? 0) > 0 ? (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        )}
+
+        <Modal visible={menuVisible} transparent animationType="fade">
+          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+            <View style={styles.menuContent}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  router.push("/account-settings");
+                }}
+              >
+                <Text style={styles.menuText}>Account Settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  router.push("/agents");
+                }}
+              >
+                <Text style={styles.menuText}>Agents</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setMenuVisible(false);
+                  router.push("/settings");
+                }}
+              >
+                <Text style={styles.menuText}>Settings</Text>
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -528,51 +452,43 @@ export default function LiveChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSelectedConversation(null)} style={styles.headerButton}>
-            <Text style={styles.backText}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>Chat</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={toggleMute} style={styles.headerButton}>
-              <Text style={styles.logoutText}>
-                {conversations.find((c) => c.id === selectedConversation)?.muted
-                  ? "Unmute"
-                  : "Mute"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={closeConversation} style={styles.headerButton}>
-              <Text style={styles.logoutText}>Close</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setSelectedConversation(null)} style={styles.headerButton}>
+          <Text style={styles.backText}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {conversations.find((c) => c.id === selectedConversation)?.visitorName || "Chat"}
+        </Text>
+        <View style={styles.headerButton} />
+      </View>
+
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.messagesList}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        renderItem={({ item }) => (
+          <View style={[styles.messageBubble, item.sender === "agent" ? styles.agentMessage : styles.visitorMessage]}>
+            <Text style={[styles.messageText, item.sender === "agent" ? styles.agentMessageText : styles.visitorMessageText]}>
+              {item.body}
+            </Text>
+            <Text style={[styles.messageTime, item.sender === "agent" ? styles.agentMessageTime : styles.visitorMessageTime]}>
+              {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </Text>
           </View>
-        </View>
-      
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        )}
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 52 : 0}
+        style={styles.kav}
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.messagesContainer}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.messageBubble,
-                item.sender === "agent" ? styles.adminMessage : item.sender === "visitor" ? styles.userMessage : styles.systemMessage,
-              ]}
-            >
-              <Text style={[styles.messageText, item.sender === "agent" && styles.adminMessageText]}>{item.body}</Text>
-            </View>
-          )}
-        />
-        
         <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           <TextInput
-            style={styles.messageInput}
+            style={styles.input}
             value={newMessage}
             onChangeText={setNewMessage}
             placeholder="Type a message..."
@@ -583,267 +499,109 @@ export default function LiveChatScreen() {
             onPress={handleSendMessage}
             disabled={!newMessage.trim() || sending}
           >
-            {sending ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <Text style={styles.sendButtonText}>Send</Text>
-            )}
+            <Text style={styles.sendButtonText}>{sending ? "..." : "Send"}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-      <Modal
-        visible={menuVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setMenuVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setMenuVisible(false)}
-        >
-          <View style={styles.menuContainer}>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              setMenuVisible(false);
-              router.push("/agents");
-            }}
-          >
-            <Text style={styles.menuItemText}>Agents</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              setMenuVisible(false);
-              router.push("/settings");
-            }}
-          >
-            <Text style={styles.menuItemText}>LiveChat Settings</Text>
-          </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f5f5f5",
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    padding: 15,
-    backgroundColor: "#040f2d",
-  },
-  headerButton: {
-    minWidth: 60,
-    alignItems: "center",
-  },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  menuIcon: {
-    color: "white",
-    fontSize: 24,
-  },
-  headerTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-    flex: 1,
-    textAlign: "center",
-  },
-  backText: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  logoutText: {
-    color: "white",
-    fontSize: 14,
-  },
-  conversationItem: {
-    padding: 15,
-    backgroundColor: "white",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  conversationName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-    paddingRight: 30,
-  },
-  conversationPreview: {
-    fontSize: 14,
-    color: "#666",
-    paddingRight: 30,
-  },
-  emptyText: {
-    textAlign: "center",
-    marginTop: 50,
-    color: "#666",
-    fontSize: 16,
-  },
-  emptyState: {
-    alignItems: "center",
-    marginTop: 50,
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    color: "#333",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  emptyDescription: {
-    color: "#666",
-    fontSize: 14,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  retryButton: {
+    borderBottomColor: "#e5e7eb",
     backgroundColor: "#040f2d",
-    borderRadius: 8,
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
   },
-  retryButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  headerButton: { minWidth: 44, alignItems: "center", justifyContent: "center" },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "600", flex: 1, textAlign: "center" },
+  backText: { color: "#fff", fontSize: 24 },
+  menuIcon: { color: "#fff", fontSize: 24 },
+  logoutText: { color: "#fff", fontSize: 14 },
   errorBanner: {
-    alignItems: "center",
-    backgroundColor: "#fff4e5",
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "#fef2f2",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#fecaca",
   },
-  errorBannerText: {
-    color: "#7a4b00",
-    flex: 1,
-    fontSize: 13,
-  },
-  retryText: {
-    color: "#040f2d",
-    fontSize: 13,
-    fontWeight: "600",
-    marginLeft: 12,
-  },
-  messagesContainer: {
-    padding: 10,
-    paddingBottom: 20,
-  },
-  messageBubble: {
-    maxWidth: "80%",
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 5,
-  },
-  adminMessage: {
-    alignSelf: "flex-end",
-    backgroundColor: "#2563eb",
-  },
-  userMessage: {
-    alignSelf: "flex-start",
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-  },
-  systemMessage: {
-    alignSelf: "center",
-    backgroundColor: "#f0f0f0",
-  },
-  adminMessageText: {
-    color: "white",
-  },
-  messageText: {
-    color: "black",
-  },
-  badge: {
-    position: "absolute",
-    right: 10,
-    top: 10,
-    backgroundColor: "#27a343",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  inputContainer: {
+  errorBannerText: { color: "#991b1b", flex: 1 },
+  retryText: { color: "#2563eb", fontWeight: "600", marginLeft: 8 },
+  conversationItem: {
     flexDirection: "row",
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    backgroundColor: "white",
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
+    alignItems: "center",
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
   },
-  messageInput: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginRight: 10,
-    maxHeight: 100,
-  },
-  sendButton: {
+  conversationName: { fontSize: 16, fontWeight: "600", color: "#111" },
+  conversationEmail: { fontSize: 13, color: "#666", marginTop: 2 },
+  mutedText: { fontSize: 12, color: "#888", marginTop: 2 },
+  conversationMeta: { alignItems: "flex-end", marginLeft: 8 },
+  unreadBadge: {
     backgroundColor: "#2563eb",
-    borderRadius: 20,
-    paddingHorizontal: 20,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 6,
+    marginBottom: 4,
   },
-  sendButtonDisabled: {
-    opacity: 0.5,
+  unreadBadgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  emptyText: { color: "#666", fontSize: 16 },
+  messagesList: { padding: 12 },
+  messageBubble: { maxWidth: "80%", padding: 10, borderRadius: 12, marginBottom: 8 },
+  agentMessage: { alignSelf: "flex-end", backgroundColor: "#2563eb" },
+  visitorMessage: { alignSelf: "flex-start", backgroundColor: "#e5e7eb" },
+  messageText: { fontSize: 15 },
+  agentMessageText: { color: "#fff" },
+  visitorMessageText: { color: "#111" },
+  messageTime: { fontSize: 11, marginTop: 4 },
+  agentMessageTime: { color: "rgba(255,255,255,0.8)", textAlign: "right" },
+  visitorMessageTime: { color: "#666" },
+  kav: { flexShrink: 0 },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    backgroundColor: "#fff",
   },
-  sendButtonText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  modalOverlay: {
+  input: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  menuContainer: {
-    position: "absolute",
-    top: 90,
-    left: 10,
-    backgroundColor: "white",
-    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 20,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    width: 200,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    maxHeight: 100,
+    fontSize: 15,
+    backgroundColor: "#fff",
   },
-  menuItem: {
-    paddingVertical: 12,
+  sendButton: {
+    marginLeft: 8,
+    backgroundColor: "#2563eb",
+    borderRadius: 20,
     paddingHorizontal: 16,
+    paddingVertical: 10,
   },
-  menuItemText: {
-    fontSize: 16,
-    color: "#333",
-  },
+  sendButtonDisabled: { opacity: 0.5 },
+  sendButtonText: { color: "#fff", fontWeight: "600" },
+  menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "flex-start" },
+  menuContent: { backgroundColor: "#fff", marginTop: 60, marginHorizontal: 12, borderRadius: 8, overflow: "hidden" },
+  menuItem: { padding: 14, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" },
+  menuText: { fontSize: 16, color: "#111" },
 });

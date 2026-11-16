@@ -1,5 +1,16 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from "react-native";
 import api from "../lib/api";
 import { routeAfterAuthentication } from "../lib/notifications/authRouting";
 
@@ -48,83 +59,89 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require("../../assets/images/orangeBGkmcq-cloud-company-white-logoFinale.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>KMCQ LiveChat Mobile</Text>
-        <Text style={styles.subtitle}>Administrator Access Only</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <Image
+            source={require("../../assets/images/orangeBGkmcq-cloud-company-white-logoFinale.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>KMCQ LiveChat Mobile</Text>
+          <Text style={styles.subtitle}>Administrator Access Only</Text>
+        </View>
 
-      <View style={styles.card}>
-        {step === "email" && (
-          <>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            <TouchableOpacity style={styles.button} onPress={sendCode} disabled={loading}>
-              <Text style={styles.buttonText}>{loading ? "Sending..." : "Send Code"}</Text>
-            </TouchableOpacity>
-          </>
-        )}
+        <View style={styles.card}>
+          {step === "email" && (
+            <>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <TouchableOpacity style={styles.button} onPress={sendCode} disabled={loading}>
+                <Text style={styles.buttonText}>{loading ? "Sending..." : "Send Code"}</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-        {step === "code" && (
-          <>
-            <Text style={styles.label}>Verification Code</Text>
-            <TextInput
-              style={styles.input}
-              value={code}
-              onChangeText={setCode}
-              placeholder="6-digit code"
-              keyboardType="number-pad"
-              maxLength={6}
-            />
-            <TouchableOpacity style={styles.button} onPress={verifyCode} disabled={loading}>
-              <Text style={styles.buttonText}>{loading ? "Verifying..." : "Verify Code"}</Text>
-            </TouchableOpacity>
-          </>
-        )}
+          {step === "code" && (
+            <>
+              <Text style={styles.label}>Verification Code</Text>
+              <TextInput
+                style={styles.input}
+                value={code}
+                onChangeText={setCode}
+                placeholder="6-digit code"
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+              <TouchableOpacity style={styles.button} onPress={verifyCode} disabled={loading}>
+                <Text style={styles.buttonText}>{loading ? "Verifying..." : "Verify Code"}</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
-        {step === "credentials" && (
-          <>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              style={styles.input}
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Username"
-              autoCapitalize="none"
-            />
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              secureTextEntry
-            />
-            <TouchableOpacity style={styles.button} onPress={login} disabled={loading}>
-              <Text style={styles.buttonText}>{loading ? "Logging in..." : "Login"}</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
+          {step === "credentials" && (
+            <>
+              <Text style={styles.label}>Username</Text>
+              <TextInput
+                style={styles.input}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Username"
+                autoCapitalize="none"
+              />
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password"
+                secureTextEntry
+              />
+              <TouchableOpacity style={styles.button} onPress={login} disabled={loading}>
+                <Text style={styles.buttonText}>{loading ? "Logging in..." : "Login"}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#040f2d", padding: 20, justifyContent: "center" },
-  header: { alignItems: "center", marginBottom: 30, marginTop: -85 },
+  flex: { flex: 1, backgroundColor: "#040f2d" },
+  container: { flexGrow: 1, backgroundColor: "#040f2d", padding: 20, justifyContent: "center" },
+  header: { alignItems: "center", marginBottom: 30 },
   logo: { width: 150, height: 150, marginBottom: 20 },
   title: { fontSize: 28, fontWeight: "bold", color: "white" },
   subtitle: { fontSize: 16, color: "#27a343", marginTop: 5 },

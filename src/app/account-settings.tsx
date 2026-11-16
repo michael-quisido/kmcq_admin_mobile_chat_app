@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import api from "../lib/api";
@@ -180,140 +191,143 @@ export default function AccountSettingsScreen() {
         <View style={styles.headerButton} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Information</Text>
-          <Text style={styles.infoText}>Email: {user?.email}</Text>
-          <Text style={styles.infoText}>Username: {user?.username}</Text>
-        </View>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account Information</Text>
+            <Text style={styles.infoText}>Email: {user?.email}</Text>
+            <Text style={styles.infoText}>Username: {user?.username}</Text>
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Change Username</Text>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            placeholder="New username"
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            value={currentPasswordUsername}
-            onChangeText={setCurrentPasswordUsername}
-            placeholder="Current password"
-            secureTextEntry
-          />
-          <TouchableOpacity style={styles.button} onPress={updateUsername} disabled={usernameLoading}>
-            <Text style={styles.buttonText}>{usernameLoading ? "Updating..." : "Update Username"}</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Change Username</Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="New username"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.input}
+              value={currentPasswordUsername}
+              onChangeText={setCurrentPasswordUsername}
+              placeholder="Current password"
+              secureTextEntry
+            />
+            <TouchableOpacity style={styles.button} onPress={updateUsername} disabled={usernameLoading}>
+              <Text style={styles.buttonText}>{usernameLoading ? "Updating..." : "Update Username"}</Text>
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Change Email</Text>
-          {emailStep === "form" ? (
-            <>
-              <TextInput
-                style={styles.input}
-                value={currentPasswordEmail}
-                onChangeText={setCurrentPasswordEmail}
-                placeholder="Current password"
-                secureTextEntry
-              />
-              <TextInput
-                style={styles.input}
-                value={newEmail}
-                onChangeText={setNewEmail}
-                placeholder="New email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <TouchableOpacity style={styles.button} onPress={requestEmailChange} disabled={emailLoading}>
-                <Text style={styles.buttonText}>{emailLoading ? "Sending..." : "Send Verification Code"}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.hint}>Verification code sent to {newEmail}</Text>
-              <TextInput
-                style={styles.input}
-                value={emailCode}
-                onChangeText={setEmailCode}
-                placeholder="6-digit code"
-                keyboardType="number-pad"
-                maxLength={6}
-              />
-              <TouchableOpacity style={styles.button} onPress={verifyEmailChange} disabled={emailLoading}>
-                <Text style={styles.buttonText}>{emailLoading ? "Verifying..." : "Verify & Update Email"}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.linkButton} onPress={() => setEmailStep("form")}>
-                <Text style={styles.linkText}>Back</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Change Email</Text>
+            {emailStep === "form" ? (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={currentPasswordEmail}
+                  onChangeText={setCurrentPasswordEmail}
+                  placeholder="Current password"
+                  secureTextEntry
+                />
+                <TextInput
+                  style={styles.input}
+                  value={newEmail}
+                  onChangeText={setNewEmail}
+                  placeholder="New email"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity style={styles.button} onPress={requestEmailChange} disabled={emailLoading}>
+                  <Text style={styles.buttonText}>{emailLoading ? "Sending..." : "Send Verification Code"}</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.hint}>Verification code sent to {newEmail}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={emailCode}
+                  onChangeText={setEmailCode}
+                  placeholder="6-digit code"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+                <TouchableOpacity style={styles.button} onPress={verifyEmailChange} disabled={emailLoading}>
+                  <Text style={styles.buttonText}>{emailLoading ? "Verifying..." : "Verify & Update Email"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.linkButton} onPress={() => setEmailStep("form")}>
+                  <Text style={styles.linkText}>Back</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Change Password</Text>
-          {passwordStep === "form" ? (
-            <>
-              <TextInput
-                style={styles.input}
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                placeholder="Current password"
-                secureTextEntry
-              />
-              <TouchableOpacity style={styles.button} onPress={requestPasswordChange} disabled={passwordLoading}>
-                <Text style={styles.buttonText}>{passwordLoading ? "Sending..." : "Send Verification Code"}</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.hint}>Verification code sent to {user?.email}</Text>
-              <TextInput
-                style={styles.input}
-                value={passwordCode}
-                onChangeText={setPasswordCode}
-                placeholder="6-digit code"
-                keyboardType="number-pad"
-                maxLength={6}
-              />
-              <TextInput
-                style={styles.input}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                placeholder="New password"
-                secureTextEntry
-              />
-              <TextInput
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Confirm new password"
-                secureTextEntry
-              />
-              <TouchableOpacity style={styles.button} onPress={verifyPasswordChange} disabled={passwordLoading}>
-                <Text style={styles.buttonText}>{passwordLoading ? "Updating..." : "Update Password"}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.linkButton} onPress={() => setPasswordStep("form")}>
-                <Text style={styles.linkText}>Back</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </ScrollView>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Change Password</Text>
+            {passwordStep === "form" ? (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="Current password"
+                  secureTextEntry
+                />
+                <TouchableOpacity style={styles.button} onPress={requestPasswordChange} disabled={passwordLoading}>
+                  <Text style={styles.buttonText}>{passwordLoading ? "Sending..." : "Send Verification Code"}</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.hint}>Verification code sent to {user?.email}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={passwordCode}
+                  onChangeText={setPasswordCode}
+                  placeholder="6-digit code"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+                <TextInput
+                  style={styles.input}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="New password"
+                  secureTextEntry
+                />
+                <TextInput
+                  style={styles.input}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm new password"
+                  secureTextEntry
+                />
+                <TouchableOpacity style={styles.button} onPress={verifyPasswordChange} disabled={passwordLoading}>
+                  <Text style={styles.buttonText}>{passwordLoading ? "Updating..." : "Update Password"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.linkButton} onPress={() => setPasswordStep("form")}>
+                  <Text style={styles.linkText}>Back</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
+  flex: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#f5f5f5" },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 15, backgroundColor: "#040f2d" },
   headerButton: { minWidth: 60, alignItems: "center" },
   backText: { color: "white", fontSize: 20, fontWeight: "bold" },
   headerTitle: { color: "white", fontSize: 18, fontWeight: "bold", flex: 1, textAlign: "center" },
-  scrollContainer: { padding: 10 },
+  scrollContainer: { padding: 10, paddingBottom: 24 },
   section: { backgroundColor: "white", padding: 15, borderRadius: 8, marginBottom: 10 },
   sectionTitle: { fontSize: 16, fontWeight: "bold", color: "#333", marginBottom: 10 },
   infoText: { fontSize: 14, color: "#666", marginBottom: 5 },

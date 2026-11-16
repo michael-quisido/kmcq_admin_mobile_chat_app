@@ -246,7 +246,7 @@ export default function NotificationSoundScreen() {
             <View style={styles.section}>
               <Text style={styles.label}>Current sound</Text>
               <Text style={styles.value}>{info.name ? info.name : "Default (KMCQ doorbell)"}</Text>
-              <Text style={styles.hint}>Selected files are copied to private app storage. On Android, changing an existing notification channel sound may be limited by system settings.</Text>
+              <Text style={styles.hint}>Selected files are copied to private app storage. Android notification channel sound is fixed after creation (system limitation); changing it may require clearing app data or reinstalling.</Text>
             </View>
 
             <View style={styles.section}>
@@ -282,7 +282,7 @@ export default function NotificationSoundScreen() {
                 <Switch value={soundsEnabled} onValueChange={toggleSounds} />
               </View>
               <Text style={styles.hint}>
-                This controls the foreground sound only. Android notification channel sounds are managed by the system.
+                This controls the foreground sound only. For background/terminated alerts, Android uses the app-managed LiveChat notification channel; if heads-up banners stopped appearing, check system notification/channel settings and ensure channel importance/sound are allowed.
               </Text>
             </View>
 

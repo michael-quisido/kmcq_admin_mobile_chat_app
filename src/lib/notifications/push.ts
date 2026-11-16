@@ -20,6 +20,12 @@ import type { NotificationPermission, PushTestResult } from "./push.types";
 
 const PUSH_TOKEN_KEY = "kmcq_expo_push_token";
 
+let pushAuthEnabled = false;
+
+export function setPushAuthEnabled(enabled: boolean): void {
+  pushAuthEnabled = enabled;
+}
+
 function getProjectId(): string | null {
   return Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? null;
 }
@@ -69,6 +75,11 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 async function registerDeviceToken(): Promise<string | null> {
   try {
     if (!Device.isDevice) return null;
+    if (!pushAuthEnabled) return null;
+
+    if (Platform.OS === "android") {
+      await ensureLivechatNotificationChannel();
+    }
 
     let token: string;
     if (Platform.OS === "android") {
@@ -87,7 +98,11 @@ async function registerDeviceToken(): Promise<string | null> {
         platform: Platform.OS === "android" ? "android" : "ios",
       });
       await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
-    } catch {
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        setPushAuthEnabled(false);
+      }
       return null;
     }
 
@@ -104,11 +119,13 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 export async function registerForPushIfPermitted(): Promise<string | null> {
+  if (!pushAuthEnabled) return null;
   if ((await getNotificationPermission()) !== "granted") return null;
   return registerDeviceToken();
 }
 
 export async function unregisterForPushNotifications(explicitToken?: string): Promise<void> {
+  setPushAuthEnabled(false);
   try {
     await clearAllLivechatBubbles();
   } catch {

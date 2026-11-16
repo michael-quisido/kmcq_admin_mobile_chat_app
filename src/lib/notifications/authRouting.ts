@@ -1,8 +1,9 @@
 import { router } from "expo-router";
-import { registerForPushIfPermitted } from "./push";
+import { registerForPushIfPermitted, setPushAuthEnabled } from "./push";
 import { consumePendingConversationId } from "./pendingConversation";
 
 export function routeAfterAuthentication(): void {
+  setPushAuthEnabled(true);
   void registerForPushIfPermitted().catch(() => {});
 
   const pending = consumePendingConversationId();
