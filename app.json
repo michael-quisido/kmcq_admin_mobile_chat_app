@@ -14,7 +14,6 @@
       "package": "com.kmcq.adminmobilechatapp",
       "googleServicesFile": "./google-services.json",
       "versionCode": 2,
-      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/kmcq-gmbh-android-icon-foreground-512x512.png",
@@ -64,7 +63,8 @@
           "sounds": ["./assets/notification_sound/kmcq_gmbh_doorbell.wav"]
         }
       ],
-      "./plugins/withLivechatBubbles"
+      "./plugins/withLivechatBubbles",
+      "./plugins/withAndroidAdjustResize"
     ],
     "experiments": {
       "typedRoutes": true,
