@@ -463,29 +463,28 @@ export default function LiveChatScreen() {
         <View style={styles.headerButton} />
       </View>
 
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.messagesList}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        renderItem={({ item }) => (
-          <View style={[styles.messageBubble, item.sender === "agent" ? styles.agentMessage : styles.visitorMessage]}>
-            <Text style={[styles.messageText, item.sender === "agent" ? styles.agentMessageText : styles.visitorMessageText]}>
-              {item.body}
-            </Text>
-            <Text style={[styles.messageTime, item.sender === "agent" ? styles.agentMessageTime : styles.visitorMessageTime]}>
-              {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </Text>
-          </View>
-        )}
-      />
-
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={insets.top + 52}
-        style={styles.kav}
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 52 : 0}
+        style={styles.flex}
       >
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.messagesList}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          renderItem={({ item }) => (
+            <View style={[styles.messageBubble, item.sender === "agent" ? styles.agentMessage : styles.visitorMessage]}>
+              <Text style={[styles.messageText, item.sender === "agent" ? styles.agentMessageText : styles.visitorMessageText]}>
+                {item.body}
+              </Text>
+              <Text style={[styles.messageTime, item.sender === "agent" ? styles.agentMessageTime : styles.visitorMessageTime]}>
+                {new Date(item.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </Text>
+            </View>
+          )}
+        />
         <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           <TextInput
             style={styles.input}
@@ -570,7 +569,7 @@ const styles = StyleSheet.create({
   messageTime: { fontSize: 11, marginTop: 4 },
   agentMessageTime: { color: "rgba(255,255,255,0.8)", textAlign: "right" },
   visitorMessageTime: { color: "#666" },
-  kav: { flexShrink: 0 },
+  flex: { flex: 1 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
