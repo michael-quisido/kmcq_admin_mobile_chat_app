@@ -192,7 +192,12 @@ export default function AccountSettingsScreen() {
       </View>
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        >
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Account Information</Text>
             <Text style={styles.infoText}>Email: {user?.email}</Text>
