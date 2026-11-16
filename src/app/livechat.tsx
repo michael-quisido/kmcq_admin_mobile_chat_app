@@ -483,7 +483,7 @@ export default function LiveChatScreen() {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 52 : 0}
+        keyboardVerticalOffset={insets.top + 52}
         style={styles.kav}
       >
         <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 10) }]}>
