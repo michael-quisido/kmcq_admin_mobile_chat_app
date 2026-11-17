@@ -132,6 +132,10 @@ export default function LiveChatScreen() {
   }, []);
 
   useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  useEffect(() => {
     selectedConversationRef.current = selectedConversation;
     if (selectedConversation) {
       lastMessageIdRef.current = 0;
@@ -332,13 +336,60 @@ export default function LiveChatScreen() {
     } catch {}
   };
 
+  const closeConversation = async () => {
+    if (!selectedConversation) return;
+    const conversationId = selectedConversation;
+    Alert.alert("Close Conversation", "Are you sure you want to close this conversation?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Close",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
+              status: "closed",
+            });
+            await clearLivechatConversationBubble(conversationId);
+            setSelectedConversation(null);
+            loadConversations();
+            Alert.alert("Success", "Conversation closed");
+          } catch (error: any) {
+            Alert.alert("Error", error.response?.data?.error || "Failed to close conversation");
+          }
+        },
+      },
+    ]);
+  };
+
   const reopenConversation = async (conversationId: number) => {
     try {
-      await api.post(`/api/mobile/livechat/conversations/${conversationId}/reopen`);
+      await api.patch(`/api/mobile/livechat/conversations/${conversationId}`, {
+        status: "open",
+      });
       await loadConversations();
       handleSelectConversation(conversationId);
+      Alert.alert("Success", "Conversation reopened");
     } catch (error: any) {
       Alert.alert("Error", error.response?.data?.error || "Failed to reopen conversation");
+    }
+  };
+
+  const toggleMute = async () => {
+    if (!selectedConversation) return;
+    const current = conversationsRef.current.find((c) => c.id === selectedConversation);
+    const nextMuted = !current?.muted;
+    try {
+      await api.patch(`/api/mobile/livechat/conversations/${selectedConversation}`, {
+        muted: nextMuted,
+      });
+      if (nextMuted) {
+        await clearLivechatConversationBubble(selectedConversation);
+      }
+      setConversations((prev) =>
+        prev.map((c) => (c.id === selectedConversation ? { ...c, muted: nextMuted } : c)),
+      );
+    } catch (error: any) {
+      Alert.alert("Error", error.response?.data?.error || "Failed to update mute");
     }
   };
 
@@ -400,6 +451,7 @@ export default function LiveChatScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.conversationName}>{item.visitorName || "Unknown User"}</Text>
                   {item.visitorEmail ? <Text style={styles.conversationEmail}>{item.visitorEmail}</Text> : null}
+                  {item.status === "closed" ? <Text style={styles.closedText}>Closed</Text> : null}
                   {item.muted ? <Text style={styles.mutedText}>Muted</Text> : null}
                 </View>
                 <View style={styles.conversationMeta}>
@@ -414,7 +466,7 @@ export default function LiveChatScreen() {
           />
         )}
 
-        <Modal visible={menuVisible} transparent animationType="fade">
+        <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
           <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
             <View style={styles.menuContent}>
               <TouchableOpacity
@@ -457,10 +509,19 @@ export default function LiveChatScreen() {
         <TouchableOpacity onPress={() => setSelectedConversation(null)} style={styles.headerButton}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+        <Text style={styles.headerTitle} numberOfLines={1}>
           {conversations.find((c) => c.id === selectedConversation)?.visitorName || "Chat"}
         </Text>
-        <View style={styles.headerButton} />
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={toggleMute} style={styles.headerButton}>
+            <Text style={styles.logoutText}>
+              {conversations.find((c) => c.id === selectedConversation)?.muted ? "Unmute" : "Mute"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={closeConversation} style={styles.headerButton}>
+            <Text style={styles.logoutText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -520,6 +581,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#040f2d",
   },
   headerButton: { minWidth: 44, alignItems: "center", justifyContent: "center" },
+  headerRight: { flexDirection: "row", alignItems: "center", minWidth: 44 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "600", flex: 1, textAlign: "center" },
   backText: { color: "#fff", fontSize: 24 },
   menuIcon: { color: "#fff", fontSize: 24 },
@@ -546,6 +608,7 @@ const styles = StyleSheet.create({
   conversationName: { fontSize: 16, fontWeight: "600", color: "#111" },
   conversationEmail: { fontSize: 13, color: "#666", marginTop: 2 },
   mutedText: { fontSize: 12, color: "#888", marginTop: 2 },
+  closedText: { fontSize: 12, color: "#d33", marginTop: 2 },
   conversationMeta: { alignItems: "flex-end", marginLeft: 8 },
   unreadBadge: {
     backgroundColor: "#2563eb",
