@@ -16,7 +16,11 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import api from "../lib/api";
-import { LOGOUT_CLOSE_PARAM } from "../lib/logoutAutoClose";
+import {
+  LOGOUT_CLOSE_PARAM,
+  LOGOUT_CLOSE_VALUE,
+  markLogoutClosePending,
+} from "../lib/logoutAutoClose";
 import { Conversation, fetchConversations } from "../lib/livechat/conversations";
 import { notifyNewMessage, seedConversation } from "../lib/notifications/alertCoordinator";
 import { consumePendingConversationId, clearPendingConversationId } from "../lib/notifications/pendingConversation";
@@ -343,9 +347,10 @@ export default function LiveChatScreen() {
     clearPendingConversationId();
     try {
       await api.post("/api/mobile/livechat/auth/logout");
+      markLogoutClosePending();
       router.replace({
         pathname: "/login",
-        params: { [LOGOUT_CLOSE_PARAM]: "1" },
+        params: { [LOGOUT_CLOSE_PARAM]: LOGOUT_CLOSE_VALUE },
       });
     } catch (error) {
       router.replace("/login");

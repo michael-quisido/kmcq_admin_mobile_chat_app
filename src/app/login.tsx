@@ -14,7 +14,13 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import api from "../lib/api";
-import { isLogoutCloseParam, LOGOUT_CLOSE_PARAM } from "../lib/logoutAutoClose";
+import {
+  consumeLogoutClosePending,
+  createLogoutAutoCloseController,
+  isLogoutCloseParam,
+  LOGOUT_CLOSE_PARAM,
+  type LogoutAutoCloseController,
+} from "../lib/logoutAutoClose";
 import { routeAfterAuthentication } from "../lib/notifications/authRouting";
 
 export default function LoginScreen() {
@@ -26,26 +32,23 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const params = useLocalSearchParams<{ closeAfterLogout?: string }>();
-  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoCloseControllerRef = useRef<LogoutAutoCloseController | null>(null);
   const autoCloseArmedRef = useRef(isLogoutCloseParam(params.closeAfterLogout));
 
   const cancelAutoClose = useCallback(() => {
-    if (autoCloseTimerRef.current) {
-      clearTimeout(autoCloseTimerRef.current);
-      autoCloseTimerRef.current = null;
-    }
+    autoCloseControllerRef.current?.cancel();
   }, []);
 
   useEffect(() => {
     if (!autoCloseArmedRef.current) return;
+    if (!consumeLogoutClosePending()) return;
 
     router.setParams({ [LOGOUT_CLOSE_PARAM]: undefined });
-    autoCloseTimerRef.current = setTimeout(() => {
-      autoCloseTimerRef.current = null;
-      if (Platform.OS === "android") {
-        BackHandler.exitApp();
-      }
-    }, 1800);
+    autoCloseControllerRef.current = createLogoutAutoCloseController({
+      isAndroid: Platform.OS === "android",
+      onExit: () => BackHandler.exitApp(),
+    });
+    autoCloseControllerRef.current.arm();
 
     return cancelAutoClose;
   }, [cancelAutoClose]);
