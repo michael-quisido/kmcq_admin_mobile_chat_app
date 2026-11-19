@@ -55,6 +55,7 @@ export default function LiveChatScreen() {
   const pushRegistrationAttemptedRef = useRef(false);
   const inFlightRef = useRef({ conversations: false, agents: false, messages: false });
   const retryTimeoutsRef = useRef<{ conversations?: any; agents?: any }>({});
+  const seenMessageIdRef = useRef<Map<number, number>>(new Map());
   const params = useLocalSearchParams<{ conversationId?: string }>();
 
   useFocusEffect(
@@ -138,6 +139,13 @@ export default function LiveChatScreen() {
   useEffect(() => {
     selectedConversationRef.current = selectedConversation;
     if (selectedConversation) {
+      const opened = conversationsRef.current.find((c) => c.id === selectedConversation);
+      if (opened) {
+        seenMessageIdRef.current.set(selectedConversation, opened.lastMessageId ?? 0);
+      }
+      setConversations((prev) =>
+        prev.map((c) => (c.id === selectedConversation ? { ...c, unreadCount: 0 } : c)),
+      );
       lastMessageIdRef.current = 0;
       firstMessageLoadRef.current = true;
       loadMessages(selectedConversation);
@@ -215,10 +223,19 @@ export default function LiveChatScreen() {
         clearTimeout(retryTimeoutsRef.current.conversations);
         retryTimeoutsRef.current.conversations = undefined;
       }
-      const convs = result.conversations;
+      const convs = result.conversations.map((conv) => {
+        const seen = seenMessageIdRef.current.get(conv.id);
+        if (
+          selectedConversationRef.current === conv.id ||
+          (seen != null && (conv.lastMessageId ?? 0) <= seen)
+        ) {
+          return { ...conv, unreadCount: 0 };
+        }
+        return conv;
+      });
       if (firstConversationLoadRef.current) {
         firstConversationLoadRef.current = false;
-        for (const conv of convs) {
+        for (const conv of result.conversations) {
           const newest = conv.lastMessageId ?? 0;
           seedConversation(conv.id, newest);
         }
@@ -267,13 +284,14 @@ export default function LiveChatScreen() {
               },
             ];
           }
-          return prev.map((c) => (c.id === conversationId ? { ...c, ...data } : c));
+          return prev.map((c) => (c.id === conversationId ? { ...c, ...data, unreadCount: 0 } : c));
         });
       }
       const conversation = data as Conversation;
       if (firstMessageLoadRef.current) {
         firstMessageLoadRef.current = false;
         lastMessageIdRef.current = conversation.lastMessageId ?? 0;
+        seenMessageIdRef.current.set(conversationId, lastMessageIdRef.current);
       } else if (data.lastMessageId != null && data.lastMessageId > lastMessageIdRef.current) {
         notifyNewMessage({
           conversationId,
@@ -282,8 +300,9 @@ export default function LiveChatScreen() {
           muted: data.muted,
         });
         lastMessageIdRef.current = data.lastMessageId;
+        seenMessageIdRef.current.set(conversationId, data.lastMessageId);
       }
-      setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, ...data } : c)));
+      setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, ...data, unreadCount: 0 } : c)));
     } catch (error) {
       // Ignore errors
     } finally {
@@ -611,7 +630,7 @@ const styles = StyleSheet.create({
   closedText: { fontSize: 12, color: "#d33", marginTop: 2 },
   conversationMeta: { alignItems: "flex-end", marginLeft: 8 },
   unreadBadge: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#27a343",
     borderRadius: 10,
     minWidth: 20,
     height: 20,
