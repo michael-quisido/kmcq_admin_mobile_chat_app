@@ -62,6 +62,7 @@ import {
   registerForPushNotifications,
   requestNotificationPermission,
   sendTestMobilePush,
+  setPushAuthEnabled,
   unregisterForPushNotifications,
 } from "../push";
 
@@ -83,6 +84,7 @@ const constants = Constants as unknown as { expoConfig: unknown; easConfig: unkn
 
 beforeEach(() => {
   jest.clearAllMocks();
+  setPushAuthEnabled(true);
   consumePendingConversationId();
   constants.expoConfig = { extra: { eas: { projectId: "test-project-id" } } };
   constants.easConfig = null;
@@ -126,6 +128,15 @@ describe("notification permission", () => {
 });
 
 describe("registerForPushNotifications", () => {
+  it("does not register tokens before authentication is enabled", async () => {
+    setPushAuthEnabled(false);
+
+    await expect(registerForPushNotifications()).resolves.toBeNull();
+    expect(requestPermissions).not.toHaveBeenCalled();
+    expect(getToken).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+  });
+
   it("returns null on a simulator without prompting or requesting a token", async () => {
     mockIsDevice = false;
     await expect(registerForPushNotifications()).resolves.toBeNull();
