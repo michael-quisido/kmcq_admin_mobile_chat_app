@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("expo-router", () => ({ router: { replace: jest.fn() } }));
-jest.mock("../push", () => ({ registerForPushIfPermitted: jest.fn() }));
+jest.mock("../push", () => ({
+  registerForPushIfPermitted: jest.fn(),
+  setPushAuthEnabled: jest.fn(),
+}));
 
 import { router } from "expo-router";
-import { registerForPushIfPermitted } from "../push";
+import { registerForPushIfPermitted, setPushAuthEnabled } from "../push";
 import { consumePendingConversationId, setPendingConversationId } from "../pendingConversation";
 import { routeAfterAuthentication } from "../authRouting";
 
 const replace = jest.mocked(router.replace);
 const register = jest.mocked(registerForPushIfPermitted);
+const setPushAuthEnabledMock = jest.mocked(setPushAuthEnabled);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -23,6 +27,7 @@ describe("routeAfterAuthentication", () => {
 
     expect(replace).toHaveBeenCalledWith("/livechat");
     expect(register).toHaveBeenCalledTimes(1);
+    expect(setPushAuthEnabledMock).toHaveBeenCalledWith(true);
   });
 
   it("consumes a pending conversation and routes to it", () => {
