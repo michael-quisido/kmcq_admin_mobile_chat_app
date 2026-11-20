@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,17 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  BackHandler,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
 import api from "../lib/api";
-import {
-  consumeLogoutClosePending,
-  createLogoutAutoCloseController,
-  isLogoutCloseParam,
-  LOGOUT_CLOSE_PARAM,
-  type LogoutAutoCloseController,
-} from "../lib/logoutAutoClose";
 import { routeAfterAuthentication } from "../lib/notifications/authRouting";
 
 export default function LoginScreen() {
@@ -30,28 +21,6 @@ export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const params = useLocalSearchParams<{ closeAfterLogout?: string }>();
-  const autoCloseControllerRef = useRef<LogoutAutoCloseController | null>(null);
-  const autoCloseArmedRef = useRef(isLogoutCloseParam(params.closeAfterLogout));
-
-  const cancelAutoClose = useCallback(() => {
-    autoCloseControllerRef.current?.cancel();
-  }, []);
-
-  useEffect(() => {
-    if (!autoCloseArmedRef.current) return;
-    if (!consumeLogoutClosePending()) return;
-
-    router.setParams({ [LOGOUT_CLOSE_PARAM]: undefined });
-    autoCloseControllerRef.current = createLogoutAutoCloseController({
-      isAndroid: Platform.OS === "android",
-      onExit: () => BackHandler.exitApp(),
-    });
-    autoCloseControllerRef.current.arm();
-
-    return cancelAutoClose;
-  }, [cancelAutoClose]);
 
   const sendCode = async () => {
     setLoading(true);
@@ -93,7 +62,6 @@ export default function LoginScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      onTouchStart={cancelAutoClose}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
