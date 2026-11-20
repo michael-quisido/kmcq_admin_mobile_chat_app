@@ -18,15 +18,15 @@ describe("API_BASE_URL", () => {
 
     const { API_BASE_URL } = require("../api");
 
-    expect(API_BASE_URL).toBe("http://10.209.252.88:3000");
+    expect(API_BASE_URL).toBe("http://10.255.243.88:3000");
   });
 
   it("uses EXPO_PUBLIC_API_URL when configured", () => {
-    process.env.EXPO_PUBLIC_API_URL = "http://10.209.252.88:3000";
+    process.env.EXPO_PUBLIC_API_URL = "http://10.255.243.88:3000";
     jest.resetModules();
 
     const { API_BASE_URL } = require("../api");
 
-    expect(API_BASE_URL).toBe("http://10.209.252.88:3000");
+    expect(API_BASE_URL).toBe("http://10.255.243.88:3000");
   });
 });
